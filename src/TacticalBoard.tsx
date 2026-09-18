@@ -1,158 +1,177 @@
-import React, { useState } from 'react';
-import Dashboard from './Dashboard';
-import TrainingModule from './TrainingModule';
-import MatchModule from './MatchModule';
-import AdminModule from './AdminModule';
-import PlayersModule from './PlayersModule';
-import TacticalBoard from './TacticalBoard';
-import StatsModule from './StatsModule';
-import Login from './Login';
-import { StaffMember, Player, MatchReport } from './types';
+import React, { useState, useRef, useEffect } from 'react';
+import { Player } from './types';
 
-const initialStaff: StaffMember[] = [
-  { id: 'admin-1', username: 'mister', password: '123', name: 'Treinador Principal', age: '40', address: 'Estádio', phone: '912345678', role: 'Administrador' }
+interface TacticalBoardProps {
+  players: Player[];
+}
+
+interface Piece {
+  id: string;
+  team: 'home' | 'away' | 'ball';
+  x: number;
+  y: number;
+  label: string;
+}
+
+// Posições base do 4-3-3 para os primeiros 11 jogadores
+const startPos = [
+  {x: 8, y: 50}, {x: 22, y: 20}, {x: 20, y: 40}, {x: 20, y: 60}, {x: 22, y: 80},
+  {x: 35, y: 50}, {x: 42, y: 30}, {x: 42, y: 70}, {x: 55, y: 20}, {x: 55, y: 80}, {x: 55, y: 50}
+];
+const genericLabels = ['GR','DD','DC','DC','DE','MDC','MC','MC','ED','EE','PL'];
+
+const awayPieces: Piece[] = [
+  { id: 'a1', team: 'away', x: 92, y: 50, label: 'GR' },
+  { id: 'a2', team: 'away', x: 78, y: 20, label: 'DE' },
+  { id: 'a3', team: 'away', x: 80, y: 40, label: 'DC' },
+  { id: 'a4', team: 'away', x: 80, y: 60, label: 'DC' },
+  { id: 'a5', team: 'away', x: 78, y: 80, label: 'DD' },
+  { id: 'a6', team: 'away', x: 65, y: 50, label: 'MDC' },
+  { id: 'a7', team: 'away', x: 58, y: 30, label: 'MC' },
+  { id: 'a8', team: 'away', x: 58, y: 70, label: 'MC' },
+  { id: 'a9', team: 'away', x: 45, y: 20, label: 'EE' },
+  { id: 'a10', team: 'away', x: 45, y: 80, label: 'ED' },
+  { id: 'a11', team: 'away', x: 45, y: 50, label: 'PL' },
 ];
 
-type TabType = 'dashboard' | 'training' | 'match' | 'admin' | 'players' | 'tactics' | 'stats';
+const ballPiece: Piece = { id: 'ball', team: 'ball', x: 50, y: 50, label: '⚽' };
 
-export default function App() {
-  const [staffList, setStaffList] = useState<StaffMember[]>(initialStaff);
-  const [playersList, setPlayersList] = useState<Player[]>([]);
-  const [matchReports, setMatchReports] = useState<MatchReport[]>([]); 
-  const [currentUser, setCurrentUser] = useState<StaffMember | null>(null);
-  const [loginError, setLoginError] = useState('');
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
-
-  const handleLogin = (user: string, pass: string) => {
-    const u = staffList.find(x => x.username === user && x.password === pass);
-    if (u) { setCurrentUser(u); setLoginError(''); setActiveTab('dashboard'); }
-    else setLoginError('Email ou palavra-passe incorretos.');
+export default function TacticalBoard({ players }: TacticalBoardProps) {
+  
+  // Função que constrói a equipa com base no Plantel atual
+  const getInitialPieces = (): Piece[] => {
+    let homePieces: Piece[] = [];
+    
+    if (players.length === 0) {
+      // Se não houver ninguém no plantel, usa os nomes genéricos
+      homePieces = startPos.map((pos, i) => ({
+        id: `h${i}`, team: 'home', x: pos.x, y: pos.y, label: genericLabels[i]
+      }));
+    } else {
+      // Cria uma peça para cada jogador real do Plantel
+      homePieces = players.map((p, i) => {
+        // Encurtar o nome (Ex: "João Pedro Silva" -> "J. Silva")
+        const nameParts = p.name.trim().split(' ');
+        const shortName = nameParts.length > 1 
+          ? `${nameParts[0][0]}.${nameParts[nameParts.length-1]}` 
+          : p.name;
+        
+        // Os primeiros 11 vão para o campo. Os restantes ficam na linha de fundo (suplentes)
+        const pos = i < 11 ? startPos[i] : { x: 5 + (i - 11) * 8, y: 96 }; 
+        
+        return {
+          id: p.id,
+          team: 'home',
+          x: pos.x,
+          y: pos.y,
+          label: shortName
+        };
+      });
+    }
+    return [...homePieces, ...awayPieces, ballPiece];
   };
 
-  if (!currentUser) return <Login onLogin={handleLogin} error={loginError} />;
-  const isAdmin = currentUser.role === 'Administrador';
+  const [pieces, setPieces] = useState<Piece[]>(getInitialPieces());
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Início', icon: '📊' },
-    { id: 'players', label: 'Plantel', icon: '👕' },
-    { id: 'training', label: 'Treinos', icon: '⚽' },
-    { id: 'match', label: 'Jogos', icon: '🏆' },
-    { id: 'tactics', label: 'Tática', icon: '📋' },
-    { id: 'stats', label: 'Estatísticas', icon: '📈' },
-  ];
+  // Atualiza as peças no quadro se o plantel mudar
+  useEffect(() => {
+    setPieces(getInitialPieces());
+  }, [players]);
 
-  if (isAdmin) menuItems.splice(1, 0, { id: 'admin', label: 'Staff', icon: '👥' });
+  const resetBoard = () => setPieces(getInitialPieces());
+
+  const handlePointerDown = (e: React.PointerEvent, id: string) => {
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setDraggingId(id);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!draggingId || !boardRef.current) return;
+    const rect = boardRef.current.getBoundingClientRect();
+    let newX = ((e.clientX - rect.left) / rect.width) * 100;
+    let newY = ((e.clientY - rect.top) / rect.height) * 100;
+    newX = Math.max(0, Math.min(100, newX));
+    newY = Math.max(0, Math.min(100, newY));
+    setPieces(prev => prev.map(p => p.id === draggingId ? { ...p, x: newX, y: newY } : p));
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (draggingId) {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      setDraggingId(null);
+    }
+  };
 
   return (
-    <div className="flex h-screen bg-[#0b1121] text-slate-200 font-sans overflow-hidden">
-      
-      {/* SIDEBAR DESKTOP (Escondida em Telemóveis) */}
-      <aside className="hidden md:flex w-72 bg-[#151c2c] border-r border-slate-800 flex-col z-20 shadow-2xl">
-        <div className="p-8 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="bg-black w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border border-slate-800">
-              <span className="text-white font-black text-xl">SP<span className="text-blue-500">.</span></span>
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-white tracking-tight">ScoutPro</h1>
-              <p className="text-[10px] text-blue-400 mt-0.5 uppercase tracking-widest font-bold">Sub-19 • AF Porto</p>
-            </div>
-          </div>
+    <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900">Quadro Tático Interativo</h2>
+          <p className="text-sm text-slate-500">Arraste os jogadores pelo campo. Os jogadores adicionados ao <b>Plantel</b> aparecem aqui automaticamente.</p>
         </div>
+        <button onClick={resetBoard} className="bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-700 transition-colors shadow-lg">
+          Reiniciar Posições
+        </button>
+      </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 px-4">Menu Principal</div>
-          {menuItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id as TabType)}
-              className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl font-semibold transition-all duration-200 text-sm ${
-                activeTab === item.id 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' 
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
+      {/* O Campo de Futebol */}
+      <div 
+        ref={boardRef}
+        className="relative w-full overflow-hidden rounded-xl shadow-inner bg-green-700 border-4 border-green-800"
+        style={{ aspectRatio: '105 / 68', touchAction: 'none' }}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
+        <svg viewBox="0 0 105 68" className="absolute inset-0 w-full h-full pointer-events-none">
+          <g stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" fill="none">
+            <rect x="2.5" y="2.5" width="100" height="63" />
+            <line x1="52.5" y1="2.5" x2="52.5" y2="65.5" />
+            <circle cx="52.5" cy="34" r="9.15" />
+            <circle cx="52.5" cy="34" r="0.5" fill="white" />
+            <rect x="2.5" y="13.8" width="16.5" height="40.3" />
+            <rect x="2.5" y="24.8" width="5.5" height="18.3" />
+            <circle cx="13.5" cy="34" r="0.5" fill="white" />
+            <path d="M 19 25.5 A 9.15 9.15 0 0 1 19 42.5" />
+            <rect x="86" y="13.8" width="16.5" height="40.3" />
+            <rect x="97" y="24.8" width="5.5" height="18.3" />
+            <circle cx="91.5" cy="34" r="0.5" fill="white" />
+            <path d="M 86 25.5 A 9.15 9.15 0 0 0 86 42.5" />
+          </g>
+        </svg>
+
+        {/* Peças (Jogadores e Bola) */}
+        {pieces.map(piece => {
+          const isBall = piece.team === 'ball';
+          const isHome = piece.team === 'home';
+          const isAway = piece.team === 'away';
+
+          let classes = 'absolute flex items-center justify-center cursor-grab active:cursor-grabbing transform -translate-x-1/2 -translate-y-1/2 select-none shadow-md transition-transform duration-75';
+
+          if (isBall) {
+            classes += ' w-6 h-6 text-xl text-center drop-shadow-lg z-30';
+          } else if (isHome) {
+            // A nossa equipa usa uma etiqueta (pill) para caber o nome do jogador
+            classes += ' bg-blue-600 text-white border border-blue-400 rounded-md px-2 py-1 text-[9px] md:text-xs font-bold whitespace-nowrap z-20';
+          } else if (isAway) {
+            // Adversários continuam com círculos normais
+            classes += ' bg-red-600 text-white border-2 border-red-900 rounded-full w-6 h-6 md:w-8 md:h-8 text-[9px] font-bold z-10';
+          }
+          
+          if (draggingId === piece.id) classes += ' scale-110 md:scale-125 z-50 shadow-2xl';
+
+          return (
+            <div
+              key={piece.id}
+              onPointerDown={(e) => handlePointerDown(e, piece.id)}
+              className={classes}
+              style={{ left: `${piece.x}%`, top: `${piece.y}%`, touchAction: 'none' }}
             >
-              <span className="text-lg opacity-80">{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        {/* PERFIL DESKTOP */}
-        <div className="p-6 border-t border-slate-800 bg-[#0f172a]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-inner">
-              {currentUser.name.charAt(0)}
+              {piece.label}
             </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-bold text-white truncate">{currentUser.name}</p>
-              <p className="text-[11px] text-slate-400 truncate uppercase tracking-wider">{currentUser.role}</p>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* ÁREA PRINCIPAL DA APLICAÇÃO */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        
-        {/* HEADER TOPO (Visível em Mobile e Desktop) */}
-        <header className="bg-[#151c2c] border-b border-slate-800 px-4 md:px-8 py-4 flex justify-between items-center z-10 shadow-md">
-          
-          {/* Logo no Mobile */}
-          <div className="flex items-center gap-2 md:hidden">
-             <div className="bg-black w-8 h-8 rounded-lg flex items-center justify-center border border-slate-800">
-                <span className="text-white font-black text-xs">SP<span className="text-blue-500">.</span></span>
-             </div>
-             <h1 className="text-lg font-black text-white">ScoutPro</h1>
-          </div>
-
-          {/* Título do Módulo no Desktop */}
-          <div className="hidden md:block">
-            <h2 className="text-xl font-bold text-white">
-              {menuItems.find(m => m.id === activeTab)?.label}
-            </h2>
-          </div>
-          
-          <button 
-            onClick={() => setCurrentUser(null)} 
-            className="ml-auto px-4 py-2 rounded-lg font-bold text-xs md:text-sm bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 transition-all"
-          >
-            Sair
-          </button>
-        </header>
-
-        {/* MÓDULOS (CORREÇÃO DE CORES AQUI) */}
-        {/* A classe text-slate-900 obriga todos os módulos a terem texto escuro e legível! */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 text-slate-900 pb-24 md:pb-12 custom-scrollbar">
-          <div className="max-w-7xl mx-auto">
-            {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
-            {activeTab === 'admin' && isAdmin && <AdminModule staff={staffList} onAddStaff={s => setStaffList([...staffList, s])} />}
-            {activeTab === 'players' && <PlayersModule players={playersList} onAddPlayer={p => setPlayersList([...playersList, p])} />}
-            {activeTab === 'training' && <TrainingModule players={playersList} />}
-            {activeTab === 'match' && <MatchModule players={playersList} reports={matchReports} onAddReport={r => setMatchReports([r, ...matchReports])} />}
-            {activeTab === 'tactics' && <TacticalBoard />}
-            {activeTab === 'stats' && <StatsModule players={playersList} reports={matchReports} />}
-          </div>
-        </main>
-
-        {/* BOTTOM NAV PARA TELEMÓVEIS (Apenas Mobile) */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#151c2c] border-t border-slate-800 z-50 px-2 py-2 flex justify-between items-center overflow-x-auto custom-scrollbar shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-           {menuItems.map(item => (
-             <button
-               key={item.id}
-               onClick={() => setActiveTab(item.id as TabType)}
-               className={`flex flex-col items-center justify-center min-w-[60px] p-2 rounded-xl transition-all ${
-                 activeTab === item.id ? 'text-blue-500 bg-blue-500/10' : 'text-slate-400 hover:text-white'
-               }`}
-             >
-               <span className="text-xl mb-1">{item.icon}</span>
-               <span className="text-[9px] font-bold tracking-wider uppercase truncate max-w-full">
-                 {item.label.split(' ')[0]} {/* Mostra só a primeira palavra para caber */}
-               </span>
-             </button>
-           ))}
-        </nav>
-
+          );
+        })}
       </div>
     </div>
   );
