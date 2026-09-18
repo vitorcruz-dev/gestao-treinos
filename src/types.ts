@@ -16,8 +16,16 @@ export interface StaffMember {
   role: UserRole;
 }
 
+export interface Team {
+  id: string;
+  year: string;
+  club: string;
+  name: string;
+}
+
 export interface Player {
   id: string;
+  teamId: string;
   name: string;
   age: string;
   position: 'GR' | 'DEF' | 'MED' | 'AVA';
@@ -60,6 +68,7 @@ export interface GoalConceded {
 
 export interface MatchReport {
   id: string;
+  teamId: string;
   date: string;
   opponent: string;
   oppTacticalSystem: string;
@@ -77,9 +86,9 @@ export interface MatchReport {
   individualEvals: IndividualMatchEval[];
 }
 
-// NOVO: Scouting de Próximos Adversários
 export interface FutureOpponentScouting {
   id: string;
+  teamId: string;
   opponentName: string;
   observationDate: string;
   tacticalModel: string;
@@ -87,7 +96,7 @@ export interface FutureOpponentScouting {
   behaviorLosing: string;
   substitutionsImpact: string;
   setPieces: string;
-  setPiecesPhotoUrl?: string; // Para a foto do lance/esquema
+  setPiecesPhotoUrl?: string;
   strengths: string;
   weaknesses: string;
   strongPlayers: string;
