@@ -8,23 +8,17 @@ interface PlayersModuleProps {
 
 export default function PlayersModule({ players, onAddPlayer }: PlayersModuleProps) {
   const [photoData, setPhotoData] = useState<string>('');
-  
-  // Novos estados para controlar a data e a idade automática
   const [birthDate, setBirthDate] = useState('');
   const [calculatedAge, setCalculatedAge] = useState('');
 
-  // Função que calcula a idade exata sempre que a data muda
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const dateVal = e.target.value;
     setBirthDate(dateVal);
-
     if (dateVal) {
       const dob = new Date(dateVal);
       const today = new Date();
       let age = today.getFullYear() - dob.getFullYear();
       const m = today.getMonth() - dob.getMonth();
-      
-      // Se ainda não fez anos este ano, subtrai 1 à idade
       if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
         age--;
       }
@@ -34,7 +28,6 @@ export default function PlayersModule({ players, onAddPlayer }: PlayersModulePro
     }
   };
 
-  // Converte a imagem carregada para um formato legível pelo navegador (Base64)
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -52,6 +45,7 @@ export default function PlayersModule({ players, onAddPlayer }: PlayersModulePro
     
     const newPlayer: Player = {
       id: Date.now().toString(),
+      teamId: '', // <--- CAMPO ADICIONADO AQUI PARA RESOLVER O ERRO
       name: formData.get('name') as string,
       age: formData.get('age') as string,
       position: formData.get('position') as any,
@@ -62,8 +56,6 @@ export default function PlayersModule({ players, onAddPlayer }: PlayersModulePro
     };
 
     onAddPlayer(newPlayer);
-    
-    // Limpar o formulário após guardar
     e.currentTarget.reset();
     setPhotoData('');
     setBirthDate('');
@@ -82,32 +74,14 @@ export default function PlayersModule({ players, onAddPlayer }: PlayersModulePro
               <label className="block text-sm font-medium">Nome do Atleta</label>
               <input type="text" name="name" required className="w-full mt-1 p-2 border rounded bg-white" />
             </div>
-            
             <div>
               <label className="block text-sm font-medium">Data de Nascimento</label>
-              <input 
-                type="date" 
-                name="birthDate" 
-                required 
-                value={birthDate}
-                onChange={handleDateChange}
-                className="w-full mt-1 p-2 border rounded bg-white" 
-              />
+              <input type="date" name="birthDate" required value={birthDate} onChange={handleDateChange} className="w-full mt-1 p-2 border rounded bg-white" />
             </div>
-            
             <div>
               <label className="block text-sm font-medium">Idade (Automática)</label>
-              <input 
-                type="number" 
-                name="age" 
-                required 
-                value={calculatedAge}
-                readOnly
-                className="w-full mt-1 p-2 border rounded bg-gray-100 text-gray-500 cursor-not-allowed font-bold" 
-                placeholder="Calculada..."
-              />
+              <input type="number" name="age" required value={calculatedAge} readOnly className="w-full mt-1 p-2 border rounded bg-gray-100 text-gray-500 cursor-not-allowed font-bold" placeholder="Calculada..." />
             </div>
-            
             <div>
               <label className="block text-sm font-medium">Posição</label>
               <select name="position" required className="w-full mt-1 p-2 border rounded bg-white">
@@ -117,7 +91,6 @@ export default function PlayersModule({ players, onAddPlayer }: PlayersModulePro
                 <option value="AVA">Avançado (AVA)</option>
               </select>
             </div>
-            
             <div>
               <label className="block text-sm font-medium">Pé Preferencial</label>
               <select name="preferredFoot" required className="w-full mt-1 p-2 border rounded bg-white">
@@ -151,7 +124,6 @@ export default function PlayersModule({ players, onAddPlayer }: PlayersModulePro
         </button>
       </form>
 
-      {/* Lista de Atletas */}
       <div>
         <h3 className="font-bold text-lg mb-4 text-slate-800">Plantel Atual ({players.length} Atletas)</h3>
         {players.length === 0 ? (
@@ -167,15 +139,6 @@ export default function PlayersModule({ players, onAddPlayer }: PlayersModulePro
                 )}
                 <h4 className="font-bold text-lg text-slate-800">{player.name}</h4>
                 <span className="bg-orange-100 text-orange-800 text-xs px-3 py-1 rounded-full font-bold mb-3">{player.position}</span>
-                <div className="text-sm text-slate-600 w-full text-left space-y-1 mt-2 border-t pt-3">
-                  <p className="flex justify-between"><strong>Idade:</strong> <span>{player.age} anos</span></p>
-                  <p className="flex justify-between"><strong>Nascimento:</strong> <span>{player.birthDate}</span></p>
-                  <p className="flex justify-between"><strong>Pé:</strong> <span>{player.preferredFoot}</span></p>
-                  <div className="mt-3 bg-gray-50 p-2 rounded border">
-                    <strong className="text-xs block text-slate-500 mb-1">Obs:</strong>
-                    <p className="text-xs italic line-clamp-3">{player.notes}</p>
-                  </div>
-                </div>
               </div>
             ))}
           </div>
