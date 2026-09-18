@@ -1,0 +1,113 @@
+import React, { useState } from 'react';
+import Dashboard from './Dashboard';
+import TrainingModule from './TrainingModule';
+import MatchModule from './MatchModule';
+import AdminModule from './AdminModule';
+import Login from './Login';
+import PlayersModule from './PlayersModule';
+import { StaffMember, Player } from './types';
+
+const initialStaff: StaffMember[] = [
+  {
+    id: 'admin-1',
+    username: 'mister',
+    password: '123',
+    name: 'Treinador Principal (Admin)',
+    age: '40',
+    address: 'Estádio do Dragão, Porto',
+    phone: '912345678',
+    role: 'Administrador'
+  }
+];
+
+export default function App() {
+  const [staffList, setStaffList] = useState<StaffMember[]>(initialStaff);
+  const [playersList, setPlayersList] = useState<Player[]>([]);
+  const [currentUser, setCurrentUser] = useState<StaffMember | null>(null);
+  const [loginError, setLoginError] = useState('');
+  
+  // A tab inicial muda para 'dashboard' (Calendário)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'training' | 'match' | 'admin' | 'players'>('dashboard');
+
+  const handleLogin = (username: string, pass: string) => {
+    const user = staffList.find(u => u.username === username && u.password === pass);
+    if (user) {
+      setCurrentUser(user);
+      setLoginError('');
+      // Ao fazer login, todos vão parar ao Dashboard inicial
+      setActiveTab('dashboard');
+    } else {
+      setLoginError('Utilizador ou palavra-passe incorretos.');
+    }
+  };
+
+  if (!currentUser) {
+    return <Login onLogin={handleLogin} error={loginError} />;
+  }
+
+  const isAdmin = currentUser.role === 'Administrador';
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
+      <div className="max-w-6xl mx-auto">
+        <header className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+          <div>
+            <h1 className="text-3xl font-extrabold text-gray-900">ScoutPro Sub-19</h1>
+            <p className="text-gray-600">
+              AF Porto | Olá, <span className="font-bold text-blue-700">{currentUser.name}</span> ({currentUser.role})
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-4 py-2 rounded font-semibold ${activeTab === 'dashboard' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 border'}`}
+            >
+              Início (Calendário)
+            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`px-4 py-2 rounded font-semibold ${activeTab === 'admin' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 border'}`}
+              >
+                Equipa Técnica
+              </button>
+            )}
+            <button
+              onClick={() => setActiveTab('players')}
+              className={`px-4 py-2 rounded font-semibold ${activeTab === 'players' ? 'bg-orange-600 text-white' : 'bg-white text-gray-600 border'}`}
+            >
+              Plantel
+            </button>
+            <button
+              onClick={() => setActiveTab('training')}
+              className={`px-4 py-2 rounded font-semibold ${activeTab === 'training' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+            >
+              Treino
+            </button>
+            <button
+              onClick={() => setActiveTab('match')}
+              className={`px-4 py-2 rounded font-semibold ${activeTab === 'match' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
+            >
+              Jogo
+            </button>
+            <button
+              onClick={() => setCurrentUser(null)}
+              className="px-4 py-2 rounded font-semibold bg-red-100 text-red-600 border border-red-200 hover:bg-red-200 ml-auto md:ml-4"
+            >
+              Sair
+            </button>
+          </div>
+        </header>
+
+        <main>
+          {activeTab === 'dashboard' && <Dashboard onNavigate={(tab) => setActiveTab(tab)} />}
+          {activeTab === 'admin' && isAdmin && <AdminModule staff={staffList} onAddStaff={(s) => setStaffList([...staffList, s])} />}
+          {activeTab === 'players' && <PlayersModule players={playersList} onAddPlayer={(p) => setPlayersList([...playersList, p])} />}
+          {activeTab === 'training' && <TrainingModule players={playersList} />}
+          {activeTab === 'match' && <MatchModule />}
+        </main>
+      </div>
+    </div>
+  );
+}
