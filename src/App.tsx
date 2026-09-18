@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from './supabase'; // LIGAÇÃO À BASE DE DADOS
 import Dashboard from './Dashboard';
 import TrainingModule from './TrainingModule';
 import TrainingPlannerModule from './TrainingPlannerModule';
@@ -12,15 +13,19 @@ import Login from './Login';
 import TeamSelection from './TeamSelection';
 import { StaffMember, Player, MatchReport, FutureOpponentScouting, Team, TrainingPlan } from './types';
 
-const initialStaff: StaffMember[] = [
-  { id: 'admin-1', username: 'mister', password: '123', name: 'Treinador Principal', age: '40', address: 'Sede', phone: '912345678', role: 'Administrador' }
-];
-
 type TabType = 'dashboard' | 'training_plan' | 'training' | 'match' | 'future_scouting' | 'admin' | 'players' | 'tactics' | 'stats';
 const TIMEOUT_MS = 15 * 60 * 1000; 
 
+// --- FUNÇÕES DE MAPEAMENTO (SUPABASE -> APP) ---
+const mapStaff = (row: any): StaffMember => ({ id: row.id, username: row.username, password: row.password, name: row.name, age: row.age, address: row.address, phone: row.phone, role: row.role });
+const mapTeam = (row: any): Team => ({ id: row.id, year: row.year, club: row.club, name: row.name });
+const mapPlayer = (row: any): Player => ({ id: row.id, teamId: row.team_id, name: row.name, age: row.age, position: row.position, preferredFoot: row.preferred_foot, birthDate: row.birth_date, notes: row.notes, photoUrl: row.photo_url });
+const mapMatch = (row: any): MatchReport => ({ id: row.id, teamId: row.team_id, date: row.date, opponent: row.opponent, oppTacticalSystem: row.opp_tactical_system, oppBehaviorWinning: row.opp_behavior_winning, oppBehaviorLosing: row.opp_behavior_losing, oppSubstitutions: row.opp_substitutions, oppSetPieces: row.opp_set_pieces, oppFinalEval: row.opp_final_eval, ownInitialSystem: row.own_initial_system, ownFinalSystem: row.own_final_system, ownTeamPositives: row.own_team_positives, ownTeamNegatives: row.own_team_negatives, goalsScored: row.goals_scored, goalsConceded: row.goals_conceded, individualEvals: row.individual_evals });
+const mapPlan = (row: any): TrainingPlan => ({ id: row.id, teamId: row.team_id, date: row.date, theme: row.theme, exercises: row.exercises, finalAppreciation: row.final_appreciation });
+const mapScouting = (row: any): FutureOpponentScouting => ({ id: row.id, teamId: row.team_id, opponentName: row.opponent_name, observationDate: row.observation_date, tacticalModel: row.tactical_model, behaviorWinning: row.behavior_winning, behaviorLosing: row.behavior_losing, substitutionsImpact: row.substitutions_impact, setPieces: row.set_pieces, setPiecesPhotoUrl: row.set_pieces_photo_url, strengths: row.strengths, weaknesses: row.weaknesses, strongPlayers: row.strong_players, weakPlayers: row.weak_players, observations: row.observations });
+
 export default function App() {
-  const [staffList, setStaffList] = useState<StaffMember[]>(initialStaff);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [playersList, setPlayersList] = useState<Player[]>([]);
   const [matchReports, setMatchReports] = useState<MatchReport[]>([]); 
@@ -31,10 +36,38 @@ export default function App() {
     const savedUser = localStorage.getItem('scoutpro_user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
+  
   const [activeTeam, setActiveTeam] = useState<Team | null>(null);
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
+  // 1. CARREGAR STAFF E EQUIPAS AO INICIAR
+  useEffect(() => {
+    supabase.from('staff').select('*').then(({ data }) => { if (data) setStaffList(data.map(mapStaff)); });
+    if (currentUser) {
+      supabase.from('teams').select('*').order('year', { ascending: false }).then(({ data }) => { if (data) setTeams(data.map(mapTeam)); });
+    }
+  }, [currentUser]);
+
+  // 2. CARREGAR OS DADOS TODOS QUANDO SE SELECIONA A EQUIPA
+  useEffect(() => {
+    if (!activeTeam) return;
+    const loadTeamData = async () => {
+      const [p, m, t, f] = await Promise.all([
+        supabase.from('players').select('*').eq('team_id', activeTeam.id),
+        supabase.from('match_reports').select('*').eq('team_id', activeTeam.id).order('date', { ascending: false }),
+        supabase.from('training_plans').select('*').eq('team_id', activeTeam.id).order('date', { ascending: false }),
+        supabase.from('future_scouting').select('*').eq('team_id', activeTeam.id).order('observation_date', { ascending: false })
+      ]);
+      if (p.data) setPlayersList(p.data.map(mapPlayer));
+      if (m.data) setMatchReports(m.data.map(mapMatch));
+      if (t.data) setTrainingPlans(t.data.map(mapPlan));
+      if (f.data) setFutureReports(f.data.map(mapScouting));
+    };
+    loadTeamData();
+  }, [activeTeam]);
+
+  // CONTROLO DE SESSÃO
   const updateActivity = useCallback(() => {
     if (currentUser) localStorage.setItem('scoutpro_last_activity', Date.now().toString());
   }, [currentUser]);
@@ -55,9 +88,11 @@ export default function App() {
     return () => { clearInterval(intervalId); events.forEach(event => window.removeEventListener(event, updateActivity)); };
   }, [currentUser, handleLogout, updateActivity]);
 
-  const handleLogin = (user: string, pass: string) => {
-    const u = staffList.find(x => x.username === user && x.password === pass);
-    if (u) { 
+  // LOGIN VIA SUPABASE
+  const handleLogin = async (user: string, pass: string) => {
+    const { data } = await supabase.from('staff').select('*').eq('username', user).eq('password', pass).single();
+    if (data) { 
+      const u = mapStaff(data);
       setCurrentUser(u); setLoginError(''); setActiveTeam(null);
       localStorage.setItem('scoutpro_user', JSON.stringify(u));
       localStorage.setItem('scoutpro_last_activity', Date.now().toString());
@@ -67,14 +102,63 @@ export default function App() {
   if (!currentUser) return <Login onLogin={handleLogin} error={loginError} />;
   const isAdmin = currentUser.role === 'Administrador';
 
-  if (!activeTeam) {
-    return <TeamSelection teams={teams} isAdmin={isAdmin} onSelectTeam={(t) => { setActiveTeam(t); setActiveTab('dashboard'); }} onCreateTeam={(t) => setTeams([...teams, t])} onLogout={handleLogout} />;
-  }
+  // --- FUNÇÕES DE GRAVAÇÃO NO SUPABASE ---
+  const handleCreateTeam = async (t: Team) => {
+    const { data } = await supabase.from('teams').insert([{ year: t.year, club: t.club, name: t.name }]).select().single();
+    if (data) setTeams([mapTeam(data), ...teams]);
+  };
 
-  const currentPlayers = playersList.filter(p => p.teamId === activeTeam.id);
-  const currentMatchReports = matchReports.filter(r => r.teamId === activeTeam.id);
-  const currentFutureReports = futureReports.filter(r => r.teamId === activeTeam.id);
-  const currentTrainingPlans = trainingPlans.filter(p => p.teamId === activeTeam.id);
+  const handleAddStaff = async (s: StaffMember) => {
+    const payload = { username: s.username, password: s.password, name: s.name, age: s.age, address: s.address, phone: s.phone, role: s.role };
+    const { data } = await supabase.from('staff').insert([payload]).select().single();
+    if (data) setStaffList([...staffList, mapStaff(data)]);
+  };
+
+  const handleAddPlayer = async (p: Player) => {
+    const payload = { team_id: activeTeam!.id, name: p.name, age: p.age, position: p.position, preferred_foot: p.preferredFoot, birth_date: p.birthDate, notes: p.notes, photo_url: p.photoUrl };
+    const { data } = await supabase.from('players').insert([payload]).select().single();
+    if (data) setPlayersList([mapPlayer(data), ...playersList]);
+  };
+
+  const handleAddTrainingPlan = async (p: TrainingPlan) => {
+    const payload = { team_id: activeTeam!.id, date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation };
+    const { data } = await supabase.from('training_plans').insert([payload]).select().single();
+    if (data) setTrainingPlans([mapPlan(data), ...trainingPlans]);
+  };
+
+  const handleUpdateTrainingPlan = async (p: TrainingPlan) => {
+    const payload = { date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation };
+    const { data } = await supabase.from('training_plans').update(payload).eq('id', p.id).select().single();
+    if (data) {
+      const updated = mapPlan(data);
+      setTrainingPlans(trainingPlans.map(plan => plan.id === updated.id ? updated : plan));
+    }
+  };
+
+  const handleAddMatchReport = async (r: MatchReport) => {
+    const payload = {
+      team_id: activeTeam!.id, date: r.date, opponent: r.opponent, opp_tactical_system: r.oppTacticalSystem, opp_behavior_winning: r.oppBehaviorWinning,
+      opp_behavior_losing: r.oppBehaviorLosing, opp_substitutions: r.oppSubstitutions, opp_set_pieces: r.oppSetPieces, opp_final_eval: r.oppFinalEval,
+      own_initial_system: r.ownInitialSystem, own_final_system: r.ownFinalSystem, own_team_positives: r.ownTeamPositives, own_team_negatives: r.ownTeamNegatives,
+      goals_scored: r.goalsScored, goals_conceded: r.goalsConceded, individual_evals: r.individualEvals
+    };
+    const { data } = await supabase.from('match_reports').insert([payload]).select().single();
+    if (data) setMatchReports([mapMatch(data), ...matchReports]);
+  };
+
+  const handleAddFutureReport = async (r: FutureOpponentScouting) => {
+    const payload = {
+      team_id: activeTeam!.id, opponent_name: r.opponentName, observation_date: r.observationDate, tactical_model: r.tacticalModel, behavior_winning: r.behaviorWinning,
+      behavior_losing: r.behaviorLosing, substitutions_impact: r.substitutionsImpact, set_pieces: r.setPieces, set_pieces_photo_url: r.setPiecesPhotoUrl,
+      strengths: r.strengths, weaknesses: r.weaknesses, strong_players: r.strongPlayers, weak_players: r.weakPlayers, observations: r.observations
+    };
+    const { data } = await supabase.from('future_scouting').insert([payload]).select().single();
+    if (data) setFutureReports([mapScouting(data), ...futureReports]);
+  };
+
+  if (!activeTeam) {
+    return <TeamSelection teams={teams} isAdmin={isAdmin} onSelectTeam={(t) => { setActiveTeam(t); setActiveTab('dashboard'); }} onCreateTeam={handleCreateTeam} onLogout={handleLogout} />;
+  }
 
   const menuItems = [
     { id: 'dashboard', label: 'Início', icon: '📊' },
@@ -140,23 +224,18 @@ export default function App() {
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 text-slate-900 pb-24 md:pb-12 custom-scrollbar">
           <div className="max-w-7xl mx-auto" key={activeTeam.id}>
             {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
-            {activeTab === 'admin' && isAdmin && <AdminModule staff={staffList} onAddStaff={s => setStaffList([...staffList, s])} />}
-            {activeTab === 'players' && <PlayersModule players={currentPlayers} onAddPlayer={p => setPlayersList([...playersList, { ...p, teamId: activeTeam.id }])} />}
+            {activeTab === 'admin' && isAdmin && <AdminModule staff={staffList} onAddStaff={handleAddStaff} />}
+            {activeTab === 'players' && <PlayersModule players={playersList} onAddPlayer={handleAddPlayer} />}
             
-            {/* LIGAÇÃO DOS PLANOS E ATUALIZAÇÃO */}
             {activeTab === 'training_plan' && (
-              <TrainingPlannerModule 
-                plans={currentTrainingPlans} 
-                onAddPlan={p => setTrainingPlans([{ ...p, teamId: activeTeam.id }, ...trainingPlans])} 
-                onUpdatePlan={p => setTrainingPlans(trainingPlans.map(plan => plan.id === p.id ? p : plan))}
-              />
+              <TrainingPlannerModule plans={trainingPlans} onAddPlan={handleAddTrainingPlan} onUpdatePlan={handleUpdateTrainingPlan} />
             )}
             
-            {activeTab === 'training' && <TrainingModule players={currentPlayers} />}
-            {activeTab === 'match' && <MatchModule players={currentPlayers} reports={currentMatchReports} onAddReport={r => setMatchReports([{ ...r, teamId: activeTeam.id }, ...matchReports])} />}
-            {activeTab === 'future_scouting' && <FutureScoutingModule reports={currentFutureReports} onAddReport={r => setFutureReports([{ ...r, teamId: activeTeam.id }, ...futureReports])} />}
-            {activeTab === 'tactics' && <TacticalBoard players={currentPlayers} />}
-            {activeTab === 'stats' && <StatsModule players={currentPlayers} reports={currentMatchReports} />}
+            {activeTab === 'training' && <TrainingModule players={playersList} />}
+            {activeTab === 'match' && <MatchModule players={playersList} reports={matchReports} onAddReport={handleAddMatchReport} />}
+            {activeTab === 'future_scouting' && <FutureScoutingModule reports={futureReports} onAddReport={handleAddFutureReport} />}
+            {activeTab === 'tactics' && <TacticalBoard players={playersList} />}
+            {activeTab === 'stats' && <StatsModule players={playersList} reports={matchReports} />}
           </div>
         </main>
 
