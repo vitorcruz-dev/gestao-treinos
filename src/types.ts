@@ -47,6 +47,7 @@ export interface TrainingEvaluation {
 
 export interface IndividualMatchEval {
   playerId: string;
+  status: 'Titular' | 'Suplente'; // NOVO: Define se começou a jogar ou se estava no banco
   minutesPlayed: number;
   rating: number;
   positives: string;
