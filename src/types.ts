@@ -1,8 +1,8 @@
-export type UserRole =
-  | 'Administrador'
-  | 'Treinador Adjunto'
-  | 'Treinador de Guarda Redes'
-  | 'Observador'
+export type UserRole = 
+  | 'Administrador' 
+  | 'Treinador Adjunto' 
+  | 'Treinador de Guarda Redes' 
+  | 'Observador' 
   | 'Preparador Físico';
 
 export interface StaffMember {
@@ -24,14 +24,14 @@ export interface Player {
   preferredFoot: 'Direito' | 'Esquerdo' | 'Ambidestro';
   birthDate: string;
   notes: string;
-  photoUrl?: string;
+  photoUrl?: string; 
 }
 
 export interface TrainingEvaluation {
   id: string;
   playerId: string;
   date: string;
-  performance: number;
+  performance: number; 
   strengths: string;
   weaknesses: string;
   observations: string;
@@ -39,7 +39,7 @@ export interface TrainingEvaluation {
 
 export interface IndividualMatchEval {
   playerId: string;
-  minutesPlayed: number; // NOVO CAMPO
+  minutesPlayed: number;
   rating: number;
   positives: string;
   negatives: string;
@@ -66,7 +66,7 @@ export interface MatchReport {
   oppBehaviorWinning: string;
   oppBehaviorLosing: string;
   oppSubstitutions: string;
-  oppSetPieces: string;
+  oppSetPieces: string; 
   oppFinalEval: string;
   ownInitialSystem: string;
   ownFinalSystem: string;
@@ -75,4 +75,22 @@ export interface MatchReport {
   goalsScored: GoalScored[];
   goalsConceded: GoalConceded[];
   individualEvals: IndividualMatchEval[];
+}
+
+// NOVO: Scouting de Próximos Adversários
+export interface FutureOpponentScouting {
+  id: string;
+  opponentName: string;
+  observationDate: string;
+  tacticalModel: string;
+  behaviorWinning: string;
+  behaviorLosing: string;
+  substitutionsImpact: string;
+  setPieces: string;
+  setPiecesPhotoUrl?: string; // Para a foto do lance/esquema
+  strengths: string;
+  weaknesses: string;
+  strongPlayers: string;
+  weakPlayers: string;
+  observations: string;
 }

@@ -6,23 +6,24 @@ import AdminModule from './AdminModule';
 import PlayersModule from './PlayersModule';
 import TacticalBoard from './TacticalBoard';
 import StatsModule from './StatsModule';
+import FutureScoutingModule from './FutureScoutingModule';
 import Login from './Login';
-import { StaffMember, Player, MatchReport } from './types';
+import { StaffMember, Player, MatchReport, FutureOpponentScouting } from './types';
 
 const initialStaff: StaffMember[] = [
   { id: 'admin-1', username: 'mister', password: '123', name: 'Treinador Principal', age: '40', address: 'Estádio', phone: '912345678', role: 'Administrador' }
 ];
 
-type TabType = 'dashboard' | 'training' | 'match' | 'admin' | 'players' | 'tactics' | 'stats';
+type TabType = 'dashboard' | 'training' | 'match' | 'future_scouting' | 'admin' | 'players' | 'tactics' | 'stats';
 
-const TIMEOUT_MS = 15 * 60 * 1000; // 15 minutos em milissegundos
+const TIMEOUT_MS = 15 * 60 * 1000; 
 
 export default function App() {
   const [staffList, setStaffList] = useState<StaffMember[]>(initialStaff);
   const [playersList, setPlayersList] = useState<Player[]>([]);
   const [matchReports, setMatchReports] = useState<MatchReport[]>([]); 
+  const [futureReports, setFutureReports] = useState<FutureOpponentScouting[]>([]);
   
-  // Inicia o utilizador verificando a memória do navegador
   const [currentUser, setCurrentUser] = useState<StaffMember | null>(() => {
     const savedUser = localStorage.getItem('scoutpro_user');
     return savedUser ? JSON.parse(savedUser) : null;
@@ -31,25 +32,20 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
-  // Atualiza a última atividade
   const updateActivity = useCallback(() => {
     if (currentUser) {
       localStorage.setItem('scoutpro_last_activity', Date.now().toString());
     }
   }, [currentUser]);
 
-  // Função central de Logout
   const handleLogout = useCallback(() => {
     setCurrentUser(null);
     localStorage.removeItem('scoutpro_user');
     localStorage.removeItem('scoutpro_last_activity');
   }, []);
 
-  // Gestor de Inatividade (15 minutos)
   useEffect(() => {
     if (!currentUser) return;
-
-    // Verifica de 30 em 30 segundos se já passaram os 15 minutos
     const intervalId = setInterval(() => {
       const lastActivity = parseInt(localStorage.getItem('scoutpro_last_activity') || '0', 10);
       if (Date.now() - lastActivity > TIMEOUT_MS) {
@@ -58,7 +54,6 @@ export default function App() {
       }
     }, 30000);
 
-    // Deteta qualquer ação do utilizador para reiniciar o tempo
     const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
     events.forEach(event => window.addEventListener(event, updateActivity));
 
@@ -74,7 +69,6 @@ export default function App() {
       setCurrentUser(u); 
       setLoginError(''); 
       setActiveTab('dashboard');
-      // Guarda o login na memória
       localStorage.setItem('scoutpro_user', JSON.stringify(u));
       localStorage.setItem('scoutpro_last_activity', Date.now().toString());
     }
@@ -88,7 +82,8 @@ export default function App() {
     { id: 'dashboard', label: 'Início', icon: '📊' },
     { id: 'players', label: 'Plantel', icon: '👕' },
     { id: 'training', label: 'Treinos', icon: '⚽' },
-    { id: 'match', label: 'Jogos', icon: '🏆' },
+    { id: 'match', label: 'Nossos Jogos', icon: '🏆' },
+    { id: 'future_scouting', label: 'Próx. Adversário', icon: '🔭' },
     { id: 'tactics', label: 'Tática', icon: '📋' },
     { id: 'stats', label: 'Estatísticas', icon: '📈' },
   ];
@@ -179,6 +174,8 @@ export default function App() {
             {activeTab === 'players' && <PlayersModule players={playersList} onAddPlayer={p => setPlayersList([...playersList, p])} />}
             {activeTab === 'training' && <TrainingModule players={playersList} />}
             {activeTab === 'match' && <MatchModule players={playersList} reports={matchReports} onAddReport={r => setMatchReports([r, ...matchReports])} />}
+            {/* NOVO MÓDULO */}
+            {activeTab === 'future_scouting' && <FutureScoutingModule reports={futureReports} onAddReport={r => setFutureReports([r, ...futureReports])} />}
             {activeTab === 'tactics' && <TacticalBoard players={playersList} />}
             {activeTab === 'stats' && <StatsModule players={playersList} reports={matchReports} />}
           </div>
@@ -190,7 +187,7 @@ export default function App() {
              <button
                key={item.id}
                onClick={() => setActiveTab(item.id as TabType)}
-               className={`flex flex-col items-center justify-center min-w-[60px] p-2 rounded-xl transition-all ${
+               className={`flex flex-col items-center justify-center min-w-[55px] p-2 rounded-xl transition-all ${
                  activeTab === item.id ? 'text-blue-500 bg-blue-500/10' : 'text-slate-400 hover:text-white'
                }`}
              >
