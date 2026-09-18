@@ -143,8 +143,14 @@ export default function App() {
             {activeTab === 'admin' && isAdmin && <AdminModule staff={staffList} onAddStaff={s => setStaffList([...staffList, s])} />}
             {activeTab === 'players' && <PlayersModule players={currentPlayers} onAddPlayer={p => setPlayersList([...playersList, { ...p, teamId: activeTeam.id }])} />}
             
-            {/* NOVO MÓDULO */}
-            {activeTab === 'training_plan' && <TrainingPlannerModule plans={currentTrainingPlans} onAddPlan={p => setTrainingPlans([{ ...p, teamId: activeTeam.id }, ...trainingPlans])} />}
+            {/* LIGAÇÃO DOS PLANOS E ATUALIZAÇÃO */}
+            {activeTab === 'training_plan' && (
+              <TrainingPlannerModule 
+                plans={currentTrainingPlans} 
+                onAddPlan={p => setTrainingPlans([{ ...p, teamId: activeTeam.id }, ...trainingPlans])} 
+                onUpdatePlan={p => setTrainingPlans(trainingPlans.map(plan => plan.id === p.id ? p : plan))}
+              />
+            )}
             
             {activeTab === 'training' && <TrainingModule players={currentPlayers} />}
             {activeTab === 'match' && <MatchModule players={currentPlayers} reports={currentMatchReports} onAddReport={r => setMatchReports([{ ...r, teamId: activeTeam.id }, ...matchReports])} />}

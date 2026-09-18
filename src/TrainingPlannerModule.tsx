@@ -5,15 +5,19 @@ import ExerciseCanvas from './ExerciseCanvas';
 interface TrainingPlannerProps {
   plans: TrainingPlan[];
   onAddPlan: (plan: TrainingPlan) => void;
+  onUpdatePlan: (plan: TrainingPlan) => void;
 }
 
-export default function TrainingPlannerModule({ plans, onAddPlan }: TrainingPlannerProps) {
+export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }: TrainingPlannerProps) {
   const [view, setView] = useState<'form' | 'list' | 'report'>('form');
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  
+  // Estado para sabermos se estamos a editar um plano existente ou a criar um novo
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [theme, setTheme] = useState('');
   
-  // Estado para cada um dos 5 exercícios
   const [ex1, setEx1] = useState({ title: 'Aquecimento', duration: '', description: '', items: [] as CanvasItem[] });
   const [ex2, setEx2] = useState({ title: 'Exercício 2', duration: '', description: '', items: [] as CanvasItem[] });
   const [ex3, setEx3] = useState({ title: 'Exercício 3', duration: '', description: '', items: [] as CanvasItem[] });
@@ -21,11 +25,37 @@ export default function TrainingPlannerModule({ plans, onAddPlan }: TrainingPlan
   const [ex5, setEx5] = useState({ title: 'Retorno à Calma', duration: '', description: '', items: [] as CanvasItem[] });
   const [appreciation, setAppreciation] = useState('');
 
+  // Limpa o formulário para criar um treino do zero
+  const startNewPlan = () => {
+    setEditingPlanId(null);
+    setDate(new Date().toISOString().split('T')[0]); setTheme(''); setAppreciation('');
+    setEx1({ title: 'Aquecimento', duration: '', description: '', items: [] });
+    setEx2({ title: 'Exercício 2', duration: '', description: '', items: [] });
+    setEx3({ title: 'Exercício 3', duration: '', description: '', items: [] });
+    setEx4({ title: 'Exercício 4', duration: '', description: '', items: [] });
+    setEx5({ title: 'Retorno à Calma', duration: '', description: '', items: [] });
+    setView('form');
+  };
+
+  // Carrega um treino guardado para o formulário
+  const startEditing = (plan: TrainingPlan) => {
+    setEditingPlanId(plan.id);
+    setDate(plan.date);
+    setTheme(plan.theme);
+    setEx1({ title: plan.exercises[0].title, duration: plan.exercises[0].duration.toString(), description: plan.exercises[0].description, items: plan.exercises[0].canvasItems });
+    setEx2({ title: plan.exercises[1].title, duration: plan.exercises[1].duration.toString(), description: plan.exercises[1].description, items: plan.exercises[1].canvasItems });
+    setEx3({ title: plan.exercises[2].title, duration: plan.exercises[2].duration.toString(), description: plan.exercises[2].description, items: plan.exercises[2].canvasItems });
+    setEx4({ title: plan.exercises[3].title, duration: plan.exercises[3].duration.toString(), description: plan.exercises[3].description, items: plan.exercises[3].canvasItems });
+    setEx5({ title: plan.exercises[4].title, duration: plan.exercises[4].duration.toString(), description: plan.exercises[4].description, items: plan.exercises[4].canvasItems });
+    setAppreciation(plan.finalAppreciation);
+    setView('form');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newPlan: TrainingPlan = {
-      id: Date.now().toString(),
-      teamId: '',
+    const planData: TrainingPlan = {
+      id: editingPlanId || Date.now().toString(),
+      teamId: '', // O App.tsx preenche
       date, theme,
       exercises: [
         { title: ex1.title, duration: Number(ex1.duration), description: ex1.description, canvasItems: ex1.items },
@@ -36,17 +66,14 @@ export default function TrainingPlannerModule({ plans, onAddPlan }: TrainingPlan
       ],
       finalAppreciation: appreciation
     };
-    onAddPlan(newPlan);
-    
-    // Reset
-    setDate(new Date().toISOString().split('T')[0]); setTheme(''); setAppreciation('');
-    setEx1({ title: 'Aquecimento', duration: '', description: '', items: [] });
-    setEx2({ title: 'Exercício 2', duration: '', description: '', items: [] });
-    setEx3({ title: 'Exercício 3', duration: '', description: '', items: [] });
-    setEx4({ title: 'Exercício 4', duration: '', description: '', items: [] });
-    setEx5({ title: 'Retorno à Calma', duration: '', description: '', items: [] });
-    
-    alert('Plano de Treino guardado com sucesso!');
+
+    if (editingPlanId) {
+      onUpdatePlan(planData);
+      alert('Plano atualizado com sucesso!');
+    } else {
+      onAddPlan(planData);
+      alert('Plano guardado com sucesso!');
+    }
     setView('list');
   };
 
@@ -57,17 +84,17 @@ export default function TrainingPlannerModule({ plans, onAddPlan }: TrainingPlan
       <div className="flex flex-col md:flex-row gap-4 mb-4">
         <div className="flex-1">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Fase do Treino</label>
-          <input type="text" value={ex.title} onChange={e => setEx({...ex, title: e.target.value})} readOnly={isFixed} className={`w-full p-3 rounded-lg font-bold ${isFixed ? 'bg-slate-200 text-slate-600' : 'bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500'}`} />
+          <input type="text" value={ex.title} onChange={e => setEx({...ex, title: e.target.value})} readOnly={isFixed} className={`w-full p-3 rounded-lg font-bold ${isFixed ? 'bg-slate-200 text-slate-600' : 'bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none'}`} />
         </div>
         <div className="w-full md:w-32">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Duração (Min)</label>
-          <input type="number" required value={ex.duration} onChange={e => setEx({...ex, duration: e.target.value})} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Ex: 15" />
+          <input type="number" required value={ex.duration} onChange={e => setEx({...ex, duration: e.target.value})} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: 15" />
         </div>
       </div>
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="flex-1">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Descrição / Regras</label>
-          <textarea required value={ex.description} onChange={e => setEx({...ex, description: e.target.value})} rows={10} className="w-full h-full min-h-[200px] p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Descreva o exercício, objetivos e regras..."></textarea>
+          <textarea required value={ex.description} onChange={e => setEx({...ex, description: e.target.value})} rows={10} className="w-full h-full min-h-[200px] p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none" placeholder="Descreva o exercício, objetivos e regras..."></textarea>
         </div>
         <div className="w-full lg:w-2/3">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Esquema Gráfico</label>
@@ -79,22 +106,41 @@ export default function TrainingPlannerModule({ plans, onAddPlan }: TrainingPlan
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 text-slate-900 relative">
-      <style>{`@media print { body * { visibility: hidden; } #plan-pdf, #plan-pdf * { visibility: visible; } #plan-pdf { position: absolute; left: 0; top: 0; width: 100%; padding: 0; } .no-print { display: none !important; } .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; } }`}</style>
+      <style>{`
+        @media print { 
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          body * { visibility: hidden; } 
+          #plan-pdf, #plan-pdf * { visibility: visible; } 
+          #plan-pdf { position: absolute; left: 0; top: 0; width: 100%; padding: 0; } 
+          .no-print { display: none !important; } 
+          .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; } 
+        }
+      `}</style>
       
-      <div className="p-4 md:p-6 border-b border-slate-100 no-print flex justify-between items-center bg-slate-50 rounded-t-2xl">
-        <div><h2 className="text-2xl font-black text-slate-900">Planeamento de Treino</h2></div>
+      <div className="p-4 md:p-6 border-b border-slate-100 no-print flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50 rounded-t-2xl">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900">Planeamento de Treino</h2>
+        </div>
         <div className="flex space-x-2 bg-slate-200 p-1 rounded-lg">
-          <button onClick={() => setView('form')} className={`px-4 py-2 rounded-md font-bold text-sm ${view === 'form' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Criar Plano</button>
-          <button onClick={() => setView('list')} className={`px-4 py-2 rounded-md font-bold text-sm ${(view === 'list' || view === 'report') ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Histórico & PDF</button>
+          <button onClick={startNewPlan} className={`px-4 py-2 rounded-md font-bold text-sm transition-all ${view === 'form' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Criar Plano</button>
+          <button onClick={() => setView('list')} className={`px-4 py-2 rounded-md font-bold text-sm transition-all ${(view === 'list' || view === 'report') ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Histórico & PDF</button>
         </div>
       </div>
 
       <div className="p-4 md:p-6">
         {view === 'form' && (
-          <form onSubmit={handleSubmit} className="no-print">
+          /* O uso da propriedade "key" força o React a recriar o formulário quando editamos um treino diferente, atualizando as peças do campo! */
+          <form key={editingPlanId || 'new'} onSubmit={handleSubmit} className="no-print animate-fade-in">
+            {editingPlanId && (
+              <div className="mb-6 bg-blue-100 border border-blue-300 text-blue-800 p-3 rounded-lg font-bold flex items-center justify-between">
+                <span>✏️ Está a editar um plano guardado.</span>
+                <button type="button" onClick={startNewPlan} className="text-blue-600 hover:underline text-sm">Cancelar edição</button>
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              <div><label className="font-bold text-sm text-slate-700">Data do Treino</label><input type="date" required value={date} onChange={e => setDate(e.target.value)} className="w-full mt-1 p-3 border border-slate-300 rounded-xl bg-slate-50" /></div>
-              <div><label className="font-bold text-sm text-slate-700">Tema / Foco Principal</label><input type="text" required value={theme} onChange={e => setTheme(e.target.value)} placeholder="Ex: Transição Ofensiva" className="w-full mt-1 p-3 border border-slate-300 rounded-xl bg-slate-50" /></div>
+              <div><label className="font-bold text-sm text-slate-700">Data do Treino</label><input type="date" required value={date} onChange={e => setDate(e.target.value)} className="w-full mt-1 p-3 border border-slate-300 rounded-xl bg-slate-50 outline-none focus:border-blue-500" /></div>
+              <div><label className="font-bold text-sm text-slate-700">Tema / Foco Principal</label><input type="text" required value={theme} onChange={e => setTheme(e.target.value)} placeholder="Ex: Transição Ofensiva" className="w-full mt-1 p-3 border border-slate-300 rounded-xl bg-slate-50 outline-none focus:border-blue-500" /></div>
             </div>
 
             {renderExerciseForm(ex1, setEx1, true)}
@@ -105,19 +151,27 @@ export default function TrainingPlannerModule({ plans, onAddPlan }: TrainingPlan
 
             <div className="bg-slate-800 p-5 rounded-xl border border-slate-900 mb-6 text-white">
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Apreciação / Expectativa do Treino</label>
-              <textarea required value={appreciation} onChange={e => setAppreciation(e.target.value)} rows={3} className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-white resize-none" placeholder="Considerações finais sobre o plano..."></textarea>
+              <textarea required value={appreciation} onChange={e => setAppreciation(e.target.value)} rows={3} className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-white resize-none outline-none focus:border-blue-500" placeholder="Considerações finais sobre o plano..."></textarea>
             </div>
             
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black text-lg hover:bg-blue-700 transition-colors shadow-lg">Guardar Plano de Treino</button>
+            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black text-lg hover:bg-blue-700 transition-colors shadow-lg">
+              {editingPlanId ? 'Atualizar Plano de Treino' : 'Guardar Novo Plano'}
+            </button>
           </form>
         )}
 
         {view === 'list' && (
           <div className="space-y-4 no-print">
-            {plans.length === 0 ? <p className="text-slate-500 italic">Nenhum plano criado.</p> : plans.map(p => (
-              <div key={p.id} className="bg-white border border-slate-200 p-5 rounded-xl flex justify-between items-center shadow-sm">
-                <div><span className="text-slate-400 text-sm font-bold block">{p.date}</span><strong className="text-lg text-slate-900">{p.theme}</strong></div>
-                <button onClick={() => { setSelectedPlanId(p.id); setView('report'); }} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-slate-700">Ver & Imprimir</button>
+            {plans.length === 0 ? <p className="text-slate-500 italic bg-slate-50 p-4 border rounded-xl">Nenhum plano registado.</p> : plans.map(p => (
+              <div key={p.id} className="bg-white border border-slate-200 p-5 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm hover:shadow-md transition-all">
+                <div>
+                  <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold mb-2 inline-block">{p.date}</span>
+                  <strong className="text-lg text-slate-900 block">{p.theme}</strong>
+                </div>
+                <div className="flex gap-2 w-full md:w-auto">
+                  <button onClick={() => startEditing(p)} className="flex-1 md:flex-none bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-slate-100 transition-colors">✏️ Editar</button>
+                  <button onClick={() => { setSelectedPlanId(p.id); setView('report'); }} className="flex-1 md:flex-none bg-slate-800 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-slate-700 transition-colors">Ver PDF</button>
+                </div>
               </div>
             ))}
           </div>
@@ -125,28 +179,32 @@ export default function TrainingPlannerModule({ plans, onAddPlan }: TrainingPlan
 
         {view === 'report' && selectedPlan && (
           <div>
-            <div className="no-print mb-6 border-b border-slate-200 pb-4 flex justify-between">
-              <button onClick={() => setView('list')} className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold">&larr; Voltar</button>
-              <button onClick={() => window.print()} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex gap-2">🖨️ Imprimir Plano</button>
+            <div className="no-print mb-6 border-b border-slate-200 pb-4 flex flex-wrap gap-4 justify-between items-center">
+              <button onClick={() => setView('list')} className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold hover:bg-slate-300 transition-colors">&larr; Voltar</button>
+              <div className="flex gap-2">
+                <button onClick={() => startEditing(selectedPlan)} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg font-bold shadow-sm hover:bg-slate-100 transition-colors">✏️ Editar Plano</button>
+                <button onClick={() => window.print()} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center gap-2">🖨️ Imprimir Plano (PDF)</button>
+              </div>
             </div>
             
             <div id="plan-pdf" className="bg-white">
               <div className="border-b-2 border-slate-800 pb-4 mb-6">
+                <p className="text-slate-500 uppercase tracking-widest font-bold text-xs mb-1">ScoutPro - Departamento Técnico</p>
                 <h1 className="text-4xl font-black text-slate-900 uppercase">Plano de Treino</h1>
-                <div className="flex justify-between items-end mt-2">
+                <div className="flex justify-between items-end mt-4">
                   <p className="text-xl font-bold text-slate-700">Tema: <span className="text-blue-700">{selectedPlan.theme}</span></p>
-                  <p className="text-slate-500 font-bold">Data: {selectedPlan.date}</p>
+                  <p className="text-slate-500 font-bold bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{selectedPlan.date}</p>
                 </div>
               </div>
 
               <div className="space-y-8">
                 {selectedPlan.exercises.map((ex, i) => (
-                  <div key={i} className="break-inside-avoid border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="bg-slate-800 text-white p-3 flex justify-between items-center">
+                  <div key={i} className="break-inside-avoid border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                    <div className="bg-slate-800 text-white p-3 flex justify-between items-center print-bg">
                       <h3 className="font-black uppercase tracking-wider">{ex.title}</h3>
                       <span className="font-bold bg-slate-600 px-3 py-1 rounded-lg text-sm">{ex.duration} Min</span>
                     </div>
-                    <div className="flex flex-col md:flex-row p-4 gap-6 bg-slate-50">
+                    <div className="flex flex-col md:flex-row p-4 gap-6 bg-slate-50 print-bg">
                       <div className="flex-1 whitespace-pre-wrap text-sm text-slate-700 leading-relaxed font-medium">
                         {ex.description}
                       </div>
@@ -158,7 +216,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan }: TrainingPlan
                 ))}
               </div>
 
-              <div className="mt-8 p-5 bg-blue-50 border border-blue-200 rounded-xl break-inside-avoid">
+              <div className="mt-8 p-5 bg-blue-50 border border-blue-200 rounded-xl break-inside-avoid print-bg">
                 <h3 className="font-black text-blue-900 uppercase mb-2">Apreciação Final / Notas</h3>
                 <p className="text-sm text-slate-700 italic">{selectedPlan.finalAppreciation}</p>
               </div>
