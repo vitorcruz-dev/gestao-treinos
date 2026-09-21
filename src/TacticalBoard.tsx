@@ -38,27 +38,21 @@ const ballPiece: Piece = { id: 'ball', team: 'ball', x: 50, y: 50, label: '⚽' 
 
 export default function TacticalBoard({ players }: TacticalBoardProps) {
   
-  // Função que constrói a equipa com base no Plantel atual
   const getInitialPieces = (): Piece[] => {
     let homePieces: Piece[] = [];
     
     if (players.length === 0) {
-      // Se não houver ninguém no plantel, usa os nomes genéricos
       homePieces = startPos.map((pos, i) => ({
         id: `h${i}`, team: 'home', x: pos.x, y: pos.y, label: genericLabels[i]
       }));
     } else {
-      // Cria uma peça para cada jogador real do Plantel
       homePieces = players.map((p, i) => {
-        // Encurtar o nome (Ex: "João Pedro Silva" -> "J. Silva")
         const nameParts = p.name.trim().split(' ');
         const shortName = nameParts.length > 1 
           ? `${nameParts[0][0]}.${nameParts[nameParts.length-1]}` 
           : p.name;
         
-        // Os primeiros 11 vão para o campo. Os restantes ficam na linha de fundo (suplentes)
-        const pos = i < 11 ? startPos[i] : { x: 5 + (i - 11) * 8, y: 96 }; 
-        
+        const pos = i < 11 ? startPos[i] : { x: 5 + (i - 11) * 8, y: 94 }; 
         return {
           id: p.id,
           team: 'home',
@@ -75,7 +69,6 @@ export default function TacticalBoard({ players }: TacticalBoardProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // Atualiza as peças no quadro se o plantel mudar
   useEffect(() => {
     setPieces(getInitialPieces());
   }, [players]);
@@ -83,49 +76,60 @@ export default function TacticalBoard({ players }: TacticalBoardProps) {
   const resetBoard = () => setPieces(getInitialPieces());
 
   const handlePointerDown = (e: React.PointerEvent, id: string) => {
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    // Bloqueia o scroll nativo do telemóvel ao tocar numa peça
+    if (e.target instanceof HTMLElement) {
+      e.target.setPointerCapture(e.pointerId);
+    }
     setDraggingId(id);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!draggingId || !boardRef.current) return;
     const rect = boardRef.current.getBoundingClientRect();
+    
     let newX = ((e.clientX - rect.left) / rect.width) * 100;
     let newY = ((e.clientY - rect.top) / rect.height) * 100;
-    newX = Math.max(0, Math.min(100, newX));
-    newY = Math.max(0, Math.min(100, newY));
+    
+    // Evita que as peças saiam completamente fora do quadrado
+    newX = Math.max(2, Math.min(98, newX));
+    newY = Math.max(2, Math.min(98, newY));
+    
     setPieces(prev => prev.map(p => p.id === draggingId ? { ...p, x: newX, y: newY } : p));
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
     if (draggingId) {
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      if (e.target instanceof HTMLElement && e.target.hasPointerCapture(e.pointerId)) {
+        e.target.releasePointerCapture(e.pointerId);
+      }
       setDraggingId(null);
     }
   };
 
   return (
-    <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3">
         <div>
-          <h2 className="text-2xl font-black text-slate-900">Quadro Tático Interativo</h2>
-          <p className="text-sm text-slate-500">Arraste os jogadores pelo campo. Os jogadores adicionados ao <b>Plantel</b> aparecem aqui automaticamente.</p>
+          <h2 className="text-xl md:text-2xl font-black text-slate-900">Quadro Tático</h2>
+          <p className="text-xs md:text-sm text-slate-500">Arraste os jogadores. O plantel reflete-se automaticamente.</p>
         </div>
-        <button onClick={resetBoard} className="bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-700 transition-colors shadow-lg">
+        <button onClick={resetBoard} className="w-full md:w-auto bg-slate-800 text-white px-5 py-3 md:py-2.5 rounded-xl font-bold text-sm hover:bg-slate-700 transition-colors shadow-lg active:scale-95">
           Reiniciar Posições
         </button>
       </div>
 
-      {/* O Campo de Futebol */}
+      {/* O Campo de Futebol com proteções Mobile (overscroll, touch-none) */}
       <div 
         ref={boardRef}
-        className="relative w-full overflow-hidden rounded-xl shadow-inner bg-green-700 border-4 border-green-800"
-        style={{ aspectRatio: '105 / 68', touchAction: 'none' }}
+        className="relative w-full overflow-hidden rounded-xl shadow-inner bg-green-700 border-2 md:border-4 border-green-800 touch-none select-none"
+        style={{ aspectRatio: '105 / 68', overscrollBehavior: 'none' }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}   // <--- Crucial para mobile: se o dedo for interrompido por um popup, larga a peça
+        onPointerLeave={handlePointerUp}    // <--- Crucial: se o dedo escorregar para fora do ecrã, larga a peça
       >
         <svg viewBox="0 0 105 68" className="absolute inset-0 w-full h-full pointer-events-none">
-          <g stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" fill="none">
+          <g stroke="rgba(255,255,255,0.4)" strokeWidth="0.4" fill="none">
             <rect x="2.5" y="2.5" width="100" height="63" />
             <line x1="52.5" y1="2.5" x2="52.5" y2="65.5" />
             <circle cx="52.5" cy="34" r="9.15" />
@@ -147,26 +151,25 @@ export default function TacticalBoard({ players }: TacticalBoardProps) {
           const isHome = piece.team === 'home';
           const isAway = piece.team === 'away';
 
-          let classes = 'absolute flex items-center justify-center cursor-grab active:cursor-grabbing transform -translate-x-1/2 -translate-y-1/2 select-none shadow-md transition-transform duration-75';
+          // A classe touch-none em cada peça também ajuda a bloquear swipes acidentais
+          let classes = 'absolute flex items-center justify-center cursor-grab active:cursor-grabbing transform -translate-x-1/2 -translate-y-1/2 select-none shadow-md transition-transform duration-75 touch-none';
 
           if (isBall) {
-            classes += ' w-6 h-6 text-xl text-center drop-shadow-lg z-30';
+            classes += ' w-8 h-8 md:w-10 md:h-10 text-xl md:text-3xl text-center drop-shadow-lg z-30';
           } else if (isHome) {
-            // A nossa equipa usa uma etiqueta (pill) para caber o nome do jogador
-            classes += ' bg-blue-600 text-white border border-blue-400 rounded-md px-2 py-1 text-[9px] md:text-xs font-bold whitespace-nowrap z-20';
+            classes += ' bg-blue-600 text-white border border-blue-300 rounded-md px-1.5 py-0.5 md:px-2 md:py-1 text-[9px] md:text-xs font-bold whitespace-nowrap z-20';
           } else if (isAway) {
-            // Adversários continuam com círculos normais
-            classes += ' bg-red-600 text-white border-2 border-red-900 rounded-full w-6 h-6 md:w-8 md:h-8 text-[9px] font-bold z-10';
+            classes += ' bg-red-600 text-white border-2 border-red-900 rounded-full w-5 h-5 md:w-7 md:h-7 text-[8px] md:text-[10px] font-bold z-10';
           }
           
-          if (draggingId === piece.id) classes += ' scale-110 md:scale-125 z-50 shadow-2xl';
+          if (draggingId === piece.id) classes += ' scale-125 md:scale-150 z-50 shadow-2xl ring-2 ring-white/50';
 
           return (
             <div
               key={piece.id}
               onPointerDown={(e) => handlePointerDown(e, piece.id)}
               className={classes}
-              style={{ left: `${piece.x}%`, top: `${piece.y}%`, touchAction: 'none' }}
+              style={{ left: `${piece.x}%`, top: `${piece.y}%` }}
             >
               {piece.label}
             </div>
