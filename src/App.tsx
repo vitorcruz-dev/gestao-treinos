@@ -36,7 +36,6 @@ export default function App() {
     return savedUser ? JSON.parse(savedUser) : null;
   });
   
-  // A VARIÁVEL QUE EU TINHA APAGADO SEM QUERER!
   const [loginError, setLoginError] = useState('');
   
   const [activeTeam, setActiveTeam] = useState<Team | null>(() => {
@@ -57,9 +56,35 @@ export default function App() {
     return (savedTab as TabType) || 'dashboard';
   });
   
+  // HISTÓRICO DE NAVEGAÇÃO PARA A SETA DE RETROCEDER
+  const [tabHistory, setTabHistory] = useState<TabType[]>([activeTab]);
+
   useEffect(() => {
     localStorage.setItem('scoutpro_active_tab', activeTab);
+    
+    // Adicionar ao histórico sempre que muda de separador (sem duplicar se já estiver lá)
+    setTabHistory(prev => {
+      if (prev[prev.length - 1] === activeTab) return prev;
+      const newHistory = [...prev, activeTab];
+      if (newHistory.length > 15) newHistory.shift(); // Manter apenas as últimas 15 páginas
+      return newHistory;
+    });
   }, [activeTab]);
+
+  // FUNÇÃO DO BOTÃO RETROCEDER
+  const handleGoBack = () => {
+    setTabHistory(prev => {
+      if (prev.length > 1) {
+        const newHistory = [...prev];
+        newHistory.pop(); // Remove a página atual
+        const previousTab = newHistory[newHistory.length - 1]; // Descobre a anterior
+        setActiveTab(previousTab);
+        return newHistory;
+      }
+      setActiveTab('dashboard'); // Se não houver histórico, vai para o Início
+      return ['dashboard'];
+    });
+  };
 
   useEffect(() => {
     supabase.from('staff').select('*').then(({ data }) => { if (data) setStaffList(data.map(mapStaff)); });
@@ -225,15 +250,33 @@ export default function App() {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* CABEÇALHO ATUALIZADO COM BOTÃO DE RETROCEDER */}
         <header className="bg-[#151c2c] border-b border-slate-800 px-4 md:px-8 py-4 flex justify-between items-center z-10 shadow-md">
-          <div className="flex items-center gap-2 md:hidden">
+          
+          {/* LADO ESQUERDO MOBILE */}
+          <div className="flex items-center gap-3 md:hidden">
+             {activeTab !== 'dashboard' && (
+               <button onClick={handleGoBack} className="bg-slate-800 w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 border border-slate-700 active:bg-slate-700">
+                 <span className="font-bold text-lg leading-none mb-1">←</span>
+               </button>
+             )}
              <div className="bg-black w-8 h-8 rounded-lg flex items-center justify-center border border-slate-800"><span className="text-white font-black text-xs">SP<span className="text-blue-500">.</span></span></div>
              <div className="flex flex-col"><h1 className="text-sm font-black text-white leading-none">{activeTeam.club}</h1><span className="text-[9px] text-slate-400">{activeTeam.year}</span></div>
           </div>
-          <div className="hidden md:block"><h2 className="text-xl font-bold text-white">{menuItems.find(m => m.id === activeTab)?.label}</h2></div>
+          
+          {/* LADO ESQUERDO DESKTOP */}
+          <div className="hidden md:flex items-center gap-4">
+             {activeTab !== 'dashboard' && (
+               <button onClick={handleGoBack} className="bg-slate-800 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 border border-slate-700 hover:text-white hover:bg-slate-700 transition-colors" title="Voltar atrás">
+                 <span className="font-bold text-lg leading-none mb-1">←</span>
+               </button>
+             )}
+            <h2 className="text-xl font-bold text-white">{menuItems.find(m => m.id === activeTab)?.label}</h2>
+          </div>
+
           <div className="flex items-center gap-2">
-            <button onClick={() => setActiveTeam(null)} className="md:hidden px-3 py-2 rounded-lg font-bold text-xs bg-slate-800 text-slate-300">Trocar</button>
-            <button onClick={handleLogout} className="px-4 py-2 rounded-lg font-bold text-xs md:text-sm bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20">Sair</button>
+            <button onClick={() => setActiveTeam(null)} className="md:hidden px-3 py-2 rounded-lg font-bold text-xs bg-slate-800 text-slate-300 border border-slate-700">Trocar</button>
+            <button onClick={handleLogout} className="px-4 py-2 rounded-lg font-bold text-xs md:text-sm bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 transition-colors">Sair</button>
           </div>
         </header>
 
