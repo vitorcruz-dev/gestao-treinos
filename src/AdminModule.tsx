@@ -60,6 +60,7 @@ export default function AdminModule({ staff, onAddStaff }: AdminModuleProps) {
               className="w-full mt-1 p-2 border rounded"
             >
               <option value="">Selecione a função...</option>
+              <option value="Treinador Principal">Treinador Adjunto</option>
               <option value="Treinador Adjunto">Treinador Adjunto</option>
               <option value="Treinador de Guarda Redes">
                 Treinador de Guarda Redes
