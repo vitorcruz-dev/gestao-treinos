@@ -36,13 +36,14 @@ export default function App() {
     return savedUser ? JSON.parse(savedUser) : null;
   });
   
-  // 1. MEMORIZAR A EQUIPA
+  // A VARIÁVEL QUE EU TINHA APAGADO SEM QUERER!
+  const [loginError, setLoginError] = useState('');
+  
   const [activeTeam, setActiveTeam] = useState<Team | null>(() => {
     const savedTeam = localStorage.getItem('scoutpro_active_team');
     return savedTeam ? JSON.parse(savedTeam) : null;
   });
 
-  // Guardar a equipa no navegador sempre que for alterada
   useEffect(() => {
     if (activeTeam) {
       localStorage.setItem('scoutpro_active_team', JSON.stringify(activeTeam));
@@ -51,13 +52,11 @@ export default function App() {
     }
   }, [activeTeam]);
 
-  // 2. MEMORIZAR O MENU (TAB)
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const savedTab = localStorage.getItem('scoutpro_active_tab');
     return (savedTab as TabType) || 'dashboard';
   });
   
-  // Guardar a página atual sempre que o mister muda de menu
   useEffect(() => {
     localStorage.setItem('scoutpro_active_tab', activeTab);
   }, [activeTab]);
@@ -90,7 +89,6 @@ export default function App() {
     if (currentUser) localStorage.setItem('scoutpro_last_activity', Date.now().toString());
   }, [currentUser]);
 
-  // 3. LIMPAR TUDO AO SAIR DA CONTA
   const handleLogout = useCallback(() => {
     setCurrentUser(null); setActiveTeam(null);
     localStorage.removeItem('scoutpro_user'); 
@@ -177,7 +175,6 @@ export default function App() {
   };
 
   if (!activeTeam) {
-    // 4. MANTÉM NA MESMA PÁGINA AO ESCOLHER EQUIPA
     return <TeamSelection teams={teams} isAdmin={isAdmin} onSelectTeam={(t) => setActiveTeam(t)} onCreateTeam={handleCreateTeam} onLogout={handleLogout} />;
   }
 
