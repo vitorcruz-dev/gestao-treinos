@@ -36,8 +36,22 @@ export default function App() {
     return savedUser ? JSON.parse(savedUser) : null;
   });
   
-  const [activeTeam, setActiveTeam] = useState<Team | null>(null);
-  const [loginError, setLoginError] = useState('');
+  // 1. MEMORIZAR A EQUIPA
+  const [activeTeam, setActiveTeam] = useState<Team | null>(() => {
+    const savedTeam = localStorage.getItem('scoutpro_active_team');
+    return savedTeam ? JSON.parse(savedTeam) : null;
+  });
+
+  // Guardar a equipa no navegador sempre que for alterada
+  useEffect(() => {
+    if (activeTeam) {
+      localStorage.setItem('scoutpro_active_team', JSON.stringify(activeTeam));
+    } else {
+      localStorage.removeItem('scoutpro_active_team');
+    }
+  }, [activeTeam]);
+
+  // 2. MEMORIZAR O MENU (TAB)
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const savedTab = localStorage.getItem('scoutpro_active_tab');
     return (savedTab as TabType) || 'dashboard';
@@ -76,11 +90,13 @@ export default function App() {
     if (currentUser) localStorage.setItem('scoutpro_last_activity', Date.now().toString());
   }, [currentUser]);
 
+  // 3. LIMPAR TUDO AO SAIR DA CONTA
   const handleLogout = useCallback(() => {
     setCurrentUser(null); setActiveTeam(null);
     localStorage.removeItem('scoutpro_user'); 
     localStorage.removeItem('scoutpro_last_activity');
-    localStorage.removeItem('scoutpro_active_tab'); // <-- Limpa a memória da página
+    localStorage.removeItem('scoutpro_active_tab'); 
+    localStorage.removeItem('scoutpro_active_team'); 
   }, []);
 
   useEffect(() => {
@@ -161,7 +177,8 @@ export default function App() {
   };
 
   if (!activeTeam) {
-    return <TeamSelection teams={teams} isAdmin={isAdmin} onSelectTeam={(t) => { setActiveTeam(t); setActiveTab('dashboard'); }} onCreateTeam={handleCreateTeam} onLogout={handleLogout} />;
+    // 4. MANTÉM NA MESMA PÁGINA AO ESCOLHER EQUIPA
+    return <TeamSelection teams={teams} isAdmin={isAdmin} onSelectTeam={(t) => setActiveTeam(t)} onCreateTeam={handleCreateTeam} onLogout={handleLogout} />;
   }
 
   const menuItems = [
