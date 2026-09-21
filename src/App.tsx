@@ -204,8 +204,8 @@ export default function App() {
             {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
             
             {/* AQUI ESTÁ A CORREÇÃO! Removi os props dos dois módulos. */}
-            {activeTab === 'admin' && isAdmin && <AdminModule />}
-            {activeTab === 'future_scouting' && <FutureScoutingModule />}
+            {activeTab === 'admin' && isAdmin && <AdminModule staff={staffList} onAddStaff={handleAddStaff} />}
+            {activeTab === 'future_scouting' && <FutureScoutingModule reports={futureReports} onAddReport={handleAddFutureReport} />}
             
             {activeTab === 'players' && <PlayersModule players={playersList} onAddPlayer={handleAddPlayer} />}
             {activeTab === 'training_plan' && (
