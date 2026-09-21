@@ -14,7 +14,7 @@ export interface FutureOpponentScouting { id: string; teamId: string; opponentNa
 // NOVO: Planeamento de Treinos
 export interface CanvasItem {
   id: string;
-  type: 'blue' | 'red' | 'yellow' | 'green' | 'cone' | 'goal' | 'barrier';
+  type: 'blue' | 'red' | 'yellow' | 'green' | 'cone' | 'goal' | 'barrier' | 'ball' | 'player_home' | 'player_away';
   x: number;
   y: number;
 }
