@@ -13,6 +13,10 @@ interface Piece {
   label: string;
 }
 
+// Novos tipos para o desenho
+interface Point { x: number; y: number; }
+interface DrawingLine { points: Point[]; color: string; }
+
 // Posições base do 4-3-3 para os primeiros 11 jogadores
 const startPos = [
   {x: 8, y: 50}, {x: 22, y: 20}, {x: 20, y: 40}, {x: 20, y: 60}, {x: 22, y: 80},
@@ -40,7 +44,6 @@ export default function TacticalBoard({ players }: TacticalBoardProps) {
   
   const getInitialPieces = (): Piece[] => {
     let homePieces: Piece[] = [];
-    
     if (players.length === 0) {
       homePieces = startPos.map((pos, i) => ({
         id: `h${i}`, team: 'home', x: pos.x, y: pos.y, label: genericLabels[i]
@@ -48,18 +51,9 @@ export default function TacticalBoard({ players }: TacticalBoardProps) {
     } else {
       homePieces = players.map((p, i) => {
         const nameParts = p.name.trim().split(' ');
-        const shortName = nameParts.length > 1 
-          ? `${nameParts[0][0]}.${nameParts[nameParts.length-1]}` 
-          : p.name;
-        
+        const shortName = nameParts.length > 1 ? `${nameParts[0][0]}.${nameParts[nameParts.length-1]}` : p.name;
         const pos = i < 11 ? startPos[i] : { x: 5 + (i - 11) * 8, y: 94 }; 
-        return {
-          id: p.id,
-          team: 'home',
-          x: pos.x,
-          y: pos.y,
-          label: shortName
-        };
+        return { id: p.id, team: 'home', x: pos.x, y: pos.y, label: shortName };
       });
     }
     return [...homePieces, ...awayPieces, ballPiece];
@@ -67,68 +61,138 @@ export default function TacticalBoard({ players }: TacticalBoardProps) {
 
   const [pieces, setPieces] = useState<Piece[]>(getInitialPieces());
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  
+  // ESTADOS DO LÁPIS MAGNÉTICO
+  const [mode, setMode] = useState<'move' | 'draw'>('move');
+  const [drawColor, setDrawColor] = useState<string>('#fbbf24'); // Amarelo por defeito
+  const [lines, setLines] = useState<DrawingLine[]>([]);
+  const [currentLine, setCurrentLine] = useState<DrawingLine | null>(null);
+  
   const boardRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  useEffect(() => { setPieces(getInitialPieces()); }, [players]);
+
+  const resetBoard = () => {
     setPieces(getInitialPieces());
-  }, [players]);
+    setLines([]); // Apaga também os desenhos ao reiniciar
+  };
 
-  const resetBoard = () => setPieces(getInitialPieces());
+  // 1. INICIAR TOQUE (Diferencia se é na Peça ou no Fundo)
+  const handlePointerDownBoard = (e: React.PointerEvent) => {
+    if (mode !== 'draw' || !boardRef.current) return;
+    const rect = boardRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    setCurrentLine({ points: [{x, y}], color: drawColor });
+    if (e.target instanceof HTMLElement) e.target.setPointerCapture(e.pointerId);
+  };
 
-  const handlePointerDown = (e: React.PointerEvent, id: string) => {
-    // Bloqueia o scroll nativo do telemóvel ao tocar numa peça
-    if (e.target instanceof HTMLElement) {
-      e.target.setPointerCapture(e.pointerId);
-    }
+  const handlePointerDownPiece = (e: React.PointerEvent, id: string) => {
+    if (mode === 'draw') return; // Se está a desenhar, ignora as peças
+    e.stopPropagation();
+    if (e.target instanceof HTMLElement) e.target.setPointerCapture(e.pointerId);
     setDraggingId(id);
   };
 
+  // 2. MOVER O DEDO / RATO
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!draggingId || !boardRef.current) return;
+    if (!boardRef.current) return;
     const rect = boardRef.current.getBoundingClientRect();
-    
     let newX = ((e.clientX - rect.left) / rect.width) * 100;
     let newY = ((e.clientY - rect.top) / rect.height) * 100;
     
-    // Evita que as peças saiam completamente fora do quadrado
-    newX = Math.max(2, Math.min(98, newX));
-    newY = Math.max(2, Math.min(98, newY));
-    
-    setPieces(prev => prev.map(p => p.id === draggingId ? { ...p, x: newX, y: newY } : p));
+    // Desenhar
+    if (mode === 'draw' && currentLine) {
+      setCurrentLine(prev => prev ? { ...prev, points: [...prev.points, {x: newX, y: newY}] } : null);
+      return;
+    }
+
+    // Mover Peça
+    if (mode === 'move' && draggingId) {
+      newX = Math.max(2, Math.min(98, newX));
+      newY = Math.max(2, Math.min(98, newY));
+      setPieces(prev => prev.map(p => p.id === draggingId ? { ...p, x: newX, y: newY } : p));
+    }
   };
 
+  // 3. LEVANTAR O DEDO / RATO
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (draggingId) {
-      if (e.target instanceof HTMLElement && e.target.hasPointerCapture(e.pointerId)) {
-        e.target.releasePointerCapture(e.pointerId);
-      }
-      setDraggingId(null);
+    if (mode === 'draw' && currentLine) {
+      setLines(prev => [...prev, currentLine]);
+      setCurrentLine(null);
     }
+    if (draggingId) setDraggingId(null);
+    if (e.target instanceof HTMLElement && e.target.hasPointerCapture(e.pointerId)) {
+      e.target.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  // Renderizar o traço SVG
+  const renderPath = (line: DrawingLine) => {
+    if (line.points.length < 2) return null;
+    const d = `M ${line.points.map(p => `${p.x},${p.y}`).join(' L ')}`;
+    return <path d={d} stroke={line.color} strokeWidth="1" fill="none" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0px 2px 2px rgba(0,0,0,0.5))' }} />;
   };
 
   return (
     <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3">
-        <div>
-          <h2 className="text-xl md:text-2xl font-black text-slate-900">Quadro Tático</h2>
-          <p className="text-xs md:text-sm text-slate-500">Arraste os jogadores. O plantel reflete-se automaticamente.</p>
+      
+      {/* CABEÇALHO E FERRAMENTAS */}
+      <div className="flex flex-col gap-3 mb-4 md:mb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl md:text-2xl font-black text-slate-900">Quadro Tático</h2>
+            <p className="text-xs md:text-sm text-slate-500 hidden md:block">O plantel reflete-se automaticamente.</p>
+          </div>
+          <button onClick={resetBoard} className="text-xs font-bold text-slate-500 hover:text-slate-800 underline">
+            Repor e Apagar Tudo
+          </button>
         </div>
-        <button onClick={resetBoard} className="w-full md:w-auto bg-slate-800 text-white px-5 py-3 md:py-2.5 rounded-xl font-bold text-sm hover:bg-slate-700 transition-colors shadow-lg active:scale-95">
-          Reiniciar Posições
-        </button>
+
+        {/* BARRA DE FERRAMENTAS */}
+        <div className="flex flex-wrap items-center gap-2 bg-slate-100 p-2 rounded-xl border border-slate-200">
+          <button 
+            onClick={() => setMode('move')} 
+            className={`flex-1 md:flex-none px-4 py-2 rounded-lg font-bold text-sm transition-all ${mode === 'move' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-200'}`}
+          >
+            👆 Mover
+          </button>
+          <button 
+            onClick={() => setMode('draw')} 
+            className={`flex-1 md:flex-none px-4 py-2 rounded-lg font-bold text-sm transition-all ${mode === 'draw' ? 'bg-yellow-500 text-white shadow-md' : 'text-slate-600 hover:bg-slate-200'}`}
+          >
+            ✏️ Desenhar
+          </button>
+
+          {mode === 'draw' && (
+            <div className="flex flex-1 items-center gap-3 ml-auto pl-3 md:border-l border-slate-300">
+              <button onClick={() => setDrawColor('#fbbf24')} className={`w-6 h-6 md:w-8 md:h-8 rounded-full bg-yellow-400 border-2 ${drawColor === '#fbbf24' ? 'border-slate-800 scale-110' : 'border-white'} shadow-sm`}></button>
+              <button onClick={() => setDrawColor('#ef4444')} className={`w-6 h-6 md:w-8 md:h-8 rounded-full bg-red-500 border-2 ${drawColor === '#ef4444' ? 'border-slate-800 scale-110' : 'border-white'} shadow-sm`}></button>
+              <button onClick={() => setDrawColor('#ffffff')} className={`w-6 h-6 md:w-8 md:h-8 rounded-full bg-white border-2 ${drawColor === '#ffffff' ? 'border-slate-800 scale-110' : 'border-slate-300'} shadow-sm`}></button>
+              
+              <div className="flex-1"></div>
+              <button onClick={() => setLines([])} className="px-3 py-1.5 text-[10px] md:text-xs font-bold text-red-600 bg-red-100 border border-red-200 rounded-lg hover:bg-red-200 transition-colors">
+                Apagar Linhas
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* O Campo de Futebol com proteções Mobile (overscroll, touch-none) */}
+      {/* O CAMPO DE FUTEBOL */}
       <div 
         ref={boardRef}
-        className="relative w-full overflow-hidden rounded-xl shadow-inner bg-green-700 border-2 md:border-4 border-green-800 touch-none select-none"
+        className="relative w-full overflow-hidden rounded-xl shadow-inner bg-green-700 border-2 md:border-4 border-green-800 touch-none select-none cursor-crosshair"
         style={{ aspectRatio: '105 / 68', overscrollBehavior: 'none' }}
+        onPointerDown={handlePointerDownBoard}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}   // <--- Crucial para mobile: se o dedo for interrompido por um popup, larga a peça
-        onPointerLeave={handlePointerUp}    // <--- Crucial: se o dedo escorregar para fora do ecrã, larga a peça
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={handlePointerUp}
       >
-        <svg viewBox="0 0 105 68" className="absolute inset-0 w-full h-full pointer-events-none">
+        {/* Camada 1: Linhas do Campo */}
+        <svg viewBox="0 0 105 68" className="absolute inset-0 w-full h-full pointer-events-none z-0">
           <g stroke="rgba(255,255,255,0.4)" strokeWidth="0.4" fill="none">
             <rect x="2.5" y="2.5" width="100" height="63" />
             <line x1="52.5" y1="2.5" x2="52.5" y2="65.5" />
@@ -145,14 +209,21 @@ export default function TacticalBoard({ players }: TacticalBoardProps) {
           </g>
         </svg>
 
-        {/* Peças (Jogadores e Bola) */}
+        {/* Camada 2: Desenhos Livres (Ficam por cima do campo e das peças para se notar bem) */}
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full pointer-events-none z-40">
+          {lines.map((line, index) => <g key={index}>{renderPath(line)}</g>)}
+          {currentLine && renderPath(currentLine)}
+        </svg>
+
+        {/* Camada 3: Peças (Jogadores e Bola) */}
         {pieces.map(piece => {
           const isBall = piece.team === 'ball';
           const isHome = piece.team === 'home';
           const isAway = piece.team === 'away';
 
-          // A classe touch-none em cada peça também ajuda a bloquear swipes acidentais
-          let classes = 'absolute flex items-center justify-center cursor-grab active:cursor-grabbing transform -translate-x-1/2 -translate-y-1/2 select-none shadow-md transition-transform duration-75 touch-none';
+          // A MAGIA ESTÁ AQUI: Se o modo for 'draw', as peças deixam de reagir ao dedo (pointer-events-none)
+          // Isso permite desenhar linhas direitinhas por cima dos jogadores sem os arrastar por engano!
+          let classes = `absolute flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 select-none shadow-md transition-transform duration-75 touch-none ${mode === 'draw' ? 'pointer-events-none' : 'cursor-grab active:cursor-grabbing'}`;
 
           if (isBall) {
             classes += ' w-8 h-8 md:w-10 md:h-10 text-xl md:text-3xl text-center drop-shadow-lg z-30';
@@ -167,7 +238,7 @@ export default function TacticalBoard({ players }: TacticalBoardProps) {
           return (
             <div
               key={piece.id}
-              onPointerDown={(e) => handlePointerDown(e, piece.id)}
+              onPointerDown={(e) => handlePointerDownPiece(e, piece.id)}
               className={classes}
               style={{ left: `${piece.x}%`, top: `${piece.y}%` }}
             >
