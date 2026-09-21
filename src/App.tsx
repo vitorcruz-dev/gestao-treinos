@@ -38,7 +38,15 @@ export default function App() {
   
   const [activeTeam, setActiveTeam] = useState<Team | null>(null);
   const [loginError, setLoginError] = useState('');
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const savedTab = localStorage.getItem('scoutpro_active_tab');
+    return (savedTab as TabType) || 'dashboard';
+  });
+  
+  // Guardar a página atual sempre que o mister muda de menu
+  useEffect(() => {
+    localStorage.setItem('scoutpro_active_tab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     supabase.from('staff').select('*').then(({ data }) => { if (data) setStaffList(data.map(mapStaff)); });
@@ -70,7 +78,9 @@ export default function App() {
 
   const handleLogout = useCallback(() => {
     setCurrentUser(null); setActiveTeam(null);
-    localStorage.removeItem('scoutpro_user'); localStorage.removeItem('scoutpro_last_activity');
+    localStorage.removeItem('scoutpro_user'); 
+    localStorage.removeItem('scoutpro_last_activity');
+    localStorage.removeItem('scoutpro_active_tab'); // <-- Limpa a memória da página
   }, []);
 
   useEffect(() => {
