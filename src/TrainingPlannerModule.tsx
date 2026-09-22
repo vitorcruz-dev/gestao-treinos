@@ -370,7 +370,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     );
   }
 
-  // VISTA 2: DETALHES E IMPRESSÃO
+  // VISTA 2: DETALHES E IMPRESSÃO (A4 COMPACTO EM 1 PÁGINA)
   if (view === 'details' && current) {
     const currentExercises = Array.isArray(current.exercises) ? current.exercises : [];
     const validExercises = currentExercises.filter((ex: any) => (ex.title && ex.title.trim() !== '') || (ex.description && ex.description.trim() !== ''));
@@ -380,7 +380,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
         <style>
           {`
             @media print {
-              @page { size: A4 portrait; margin: 10mm; }
+              @page { size: A4 portrait; margin: 6mm; }
               body * { visibility: hidden; }
               .printable-a4, .printable-a4 * { visibility: visible; }
               html, body, #root, main { background: white !important; color: black !important; height: auto !important; overflow: visible !important; display: block !important; }
@@ -389,8 +389,18 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
               .print-text-gray { color: #444 !important; }
               .print-border-black { border-color: #000 !important; }
               .print-bg-gray { background-color: #f3f4f6 !important; }
-              .avoid-page-break { page-break-inside: avoid; break-inside: avoid; }
               .no-print { display: none !important; }
+              
+              /* ESTILOS DE AJUSTE A 1 PÁGINA */
+              .print-header { padding: 12px 16px !important; margin-bottom: 12px !important; }
+              .print-exercises-grid { 
+                display: grid !important; 
+                grid-template-columns: ${validExercises.length > 1 ? '1fr 1fr' : '1fr'} !important; 
+                gap: 10px !important; 
+              }
+              .print-exercise-card { padding: 8px 12px !important; margin-bottom: 0 !important; }
+              .print-canvas-img { max-height: 140px !important; width: auto !important; margin: 4px auto 0 auto !important; }
+              .print-notes-card { padding: 8px 12px !important; margin-top: 8px !important; }
             }
           `}
         </style>
@@ -401,8 +411,8 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
         </div>
         
         <div className="printable-a4 bg-[#151c2c] rounded-2xl border border-slate-800/60 shadow-xl overflow-hidden min-h-[297mm]">
-          <div className="p-8 border-b border-slate-800/60 print-border-black print-bg-gray">
-            <div className="flex justify-between items-start mb-6">
+          <div className="p-8 border-b border-slate-800/60 print-border-black print-bg-gray print-header">
+            <div className="flex justify-between items-start mb-4">
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-white print-text-black uppercase tracking-tight">Ficha de Treino</h1>
                 <p className="text-sm text-slate-400 print-text-gray font-medium mt-1">{activeTeam.club} • {activeTeam.year}</p>
@@ -413,33 +423,37 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
               </div>
             </div>
             
-            <div className="bg-[#0f1523] print-bg-gray p-4 rounded-xl border border-slate-700/50 print-border-black">
-              <span className="block text-[10px] text-slate-500 print-text-gray uppercase tracking-widest font-bold mb-1">Tema Principal</span>
-              <h2 className="text-lg font-semibold text-slate-100 print-text-black">{current.theme}</h2>
+            <div className="bg-[#0f1523] print-bg-gray p-3 rounded-xl border border-slate-700/50 print-border-black">
+              <span className="block text-[10px] text-slate-500 print-text-gray uppercase tracking-widest font-bold mb-0.5">Tema Principal</span>
+              <h2 className="text-base font-semibold text-slate-100 print-text-black">{current.theme}</h2>
             </div>
           </div>
 
-          <div className="p-8 space-y-8">
+          <div className="p-6 space-y-6">
             
             {validExercises.length > 0 && (
-              <div className="space-y-6">
-                <h3 className="text-sm font-bold text-slate-200 print-text-black mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-2">
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-slate-200 print-text-black mb-2 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-1">
                   <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
                   Estrutura e Exercícios
                 </h3>
-                <div className="grid grid-cols-1 gap-8">
+                
+                {/* GRELHA ADAPTÁVEL PARA A4 */}
+                <div className="print-exercises-grid grid grid-cols-1 gap-4">
                   {validExercises.map((ex: any, idx: number) => (
-                    <div key={idx} className="avoid-page-break bg-[#0f1523]/50 print-bg-gray p-5 rounded-xl border border-slate-800/60 print-border-black">
-                      <div className="flex justify-between items-start mb-3">
-                        <h4 className="text-lg font-bold text-white print-text-black">{idx + 1}. {ex.title || ex.name || 'Exercício'}</h4>
-                        {ex.duration && <span className="text-xs font-bold text-slate-400 print-text-gray bg-slate-800/50 print-bg-gray px-3 py-1.5 rounded-lg">⏳ {ex.duration} min</span>}
+                    <div key={idx} className="print-exercise-card bg-[#0f1523]/50 print-bg-gray p-4 rounded-xl border border-slate-800/60 print-border-black">
+                      <div className="flex justify-between items-start mb-1.5">
+                        <h4 className="text-sm font-bold text-white print-text-black">{idx + 1}. {ex.title || ex.name || 'Exercício'}</h4>
+                        {ex.duration && <span className="text-[10px] font-bold text-slate-400 print-text-gray bg-slate-800/50 print-bg-gray px-2 py-0.5 rounded">⏳ {ex.duration} min</span>}
                       </div>
-                      <p className="text-sm text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed mb-4">{ex.description || 'Sem descrição.'}</p>
                       
-                      {/* Cast para (ex as any).board_image para evitar erros de compilação estrita */}
+                      {ex.description && (
+                        <p className="text-xs text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed mb-2">{ex.description}</p>
+                      )}
+                      
                       {(ex as any).board_image && (
-                        <div className="w-full flex justify-center bg-[#090e17] rounded-xl overflow-hidden border border-slate-700/50 print-border-black mt-2">
-                          <img src={(ex as any).board_image} alt={`Tática ${idx + 1}`} className="max-h-[300px] w-full object-contain" />
+                        <div className="w-full flex justify-center bg-[#090e17] rounded-lg overflow-hidden border border-slate-700/50 print-border-black mt-1">
+                          <img src={(ex as any).board_image} alt={`Tática ${idx + 1}`} className="print-canvas-img max-h-[180px] w-full object-contain" />
                         </div>
                       )}
                     </div>
@@ -449,21 +463,16 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
             )}
 
             {current.finalAppreciation && (
-              <div className="avoid-page-break mt-8">
-                <h3 className="text-sm font-bold text-slate-200 print-text-black mb-3 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-2">
+              <div className="print-notes-card mt-4">
+                <h3 className="text-xs font-bold text-slate-200 print-text-black mb-2 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-1">
                   <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
                   Observações Finais
                 </h3>
-                <div className="bg-[#0f1523]/50 print-bg-gray p-4 rounded-xl border border-slate-800/60 print-border-black">
-                  <p className="text-sm text-slate-300 print-text-black whitespace-pre-wrap leading-relaxed">{current.finalAppreciation}</p>
+                <div className="bg-[#0f1523]/50 print-bg-gray p-3 rounded-xl border border-slate-800/60 print-border-black">
+                  <p className="text-xs text-slate-300 print-text-black whitespace-pre-wrap leading-relaxed">{current.finalAppreciation}</p>
                 </div>
               </div>
             )}
-
-            <div className="hidden print:block avoid-page-break mt-10">
-               <h3 className="text-sm font-bold text-black mb-3 uppercase tracking-wider">Anotações Manuais</h3>
-               <div className="border-2 border-dashed border-gray-400 h-64 rounded-xl w-full"></div>
-            </div>
 
           </div>
         </div>
