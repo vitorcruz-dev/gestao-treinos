@@ -175,47 +175,56 @@ export default function PlayersModule() {
         ) : (
           <div className="flex flex-col gap-3">
             {extPlayers.map(player => (
-              <div key={player.id} className="bg-[#151c2c] p-4 rounded-xl border border-slate-800/60 flex flex-col md:flex-row items-center gap-5 hover:border-slate-700 transition-colors shadow-sm group">
+              <div key={player.id} className="bg-[#151c2c] p-4 rounded-xl border border-slate-800/60 flex flex-col md:flex-row items-center justify-between gap-5 hover:border-slate-700 transition-colors shadow-sm group">
                 
-                <div className="shrink-0 relative">
-                  {player.photo_url ? (
-                    <img src={player.photo_url} alt={player.name} className="w-12 h-12 rounded-full object-cover border border-slate-700 shadow-sm" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-slate-800/80 flex items-center justify-center text-slate-300 text-lg font-bold border border-slate-700 shadow-sm">
-                      {player.name.charAt(0)}
+                {/* 1. Bloco da Esquerda: Avatar e Nome */}
+                <div className="flex flex-col md:flex-row items-center md:items-start gap-4 w-full md:w-auto md:flex-1 min-w-0">
+                  <div className="shrink-0 relative">
+                    {player.photo_url ? (
+                      <img src={player.photo_url} alt={player.name} className="w-12 h-12 rounded-full object-cover border border-slate-700 shadow-sm" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-slate-800/80 flex items-center justify-center text-slate-300 text-lg font-bold border border-slate-700 shadow-sm">
+                        {player.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* flex-1 min-w-0 e break-words garantem que o nome NUNCA rebenta a caixa */}
+                  <div className="flex-1 w-full text-center md:text-left min-w-0 pt-1">
+                    <h3 className="text-base font-semibold text-slate-100 leading-snug break-words whitespace-normal">{player.name}</h3>
+                    <span className="text-[10px] font-bold text-blue-400/90 uppercase tracking-widest mt-1 block">{player.position}</span>
+                  </div>
+                </div>
+                
+                {/* 2. Bloco da Direita: Stats e Botões (Quebra para coluna em ecrãs médios se faltar espaço) */}
+                <div className="flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-6 w-full md:w-auto shrink-0 mt-2 md:mt-0">
+                  
+                  {/* Estatísticas */}
+                  <div className="flex items-center justify-center gap-4 shrink-0 bg-slate-800/30 lg:bg-transparent px-4 py-2 lg:p-0 rounded-lg">
+                    <div className="text-center w-12">
+                      <span className="block text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Idade</span>
+                      <span className="font-medium text-slate-300 text-xs">{player.age ? `${player.age}A` : '-'}</span>
                     </div>
-                  )}
-                </div>
-
-                {/* CORREÇÃO AQUI: Retirado o 'truncate' para o nome ficar sempre visível */}
-                <div className="flex-1 w-full text-center md:text-left">
-                  <h3 className="text-base font-semibold text-slate-100 leading-snug">{player.name}</h3>
-                  <span className="text-[10px] font-bold text-blue-400/90 uppercase tracking-widest mt-0.5 block">{player.position}</span>
-                </div>
-                
-                <div className="flex items-center justify-center md:justify-end gap-4 w-full md:w-auto shrink-0 mt-3 md:mt-0">
-                  <div className="text-center w-12">
-                    <span className="block text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Idade</span>
-                    <span className="font-medium text-slate-300 text-xs">{player.age ? `${player.age}A` : '-'}</span>
+                    <div className="w-px h-6 bg-slate-700/50"></div>
+                    <div className="text-center w-12">
+                      <span className="block text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Pé</span>
+                      <span className="font-medium text-slate-300 text-xs">{player.preferred_foot.substring(0, 3)}</span>
+                    </div>
+                    <div className="w-px h-6 bg-slate-700/50"></div>
+                    <div className="text-center w-16">
+                      <span className="block text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Alt/Peso</span>
+                      <span className="font-medium text-slate-300 text-xs">{player.height ? `${player.height}m` : '-'}/{player.weight ? `${player.weight}kg` : '-'}</span>
+                    </div>
                   </div>
-                  <div className="w-px h-6 bg-slate-700/50"></div>
-                  <div className="text-center w-12">
-                    <span className="block text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Pé</span>
-                    <span className="font-medium text-slate-300 text-xs">{player.preferred_foot.substring(0, 3)}</span>
-                  </div>
-                  <div className="w-px h-6 bg-slate-700/50"></div>
-                  <div className="text-center w-16">
-                    <span className="block text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Alt/Peso</span>
-                    <span className="font-medium text-slate-300 text-xs">{player.height ? `${player.height}m` : '-'}/{player.weight ? `${player.weight}kg` : '-'}</span>
-                  </div>
-                </div>
 
-                <div className="flex gap-2 w-full md:w-auto shrink-0 justify-center mt-4 md:mt-0 md:ml-4">
-                  <button onClick={() => openDetails(player)} className="px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition-colors border border-slate-700/50">Ficha</button>
-                  <button onClick={() => openForm(player)} className="px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg text-[11px] font-medium border border-blue-500/20 transition-colors">Editar</button>
-                  <button onClick={() => handleDeleteClick(player.id, player.name)} className="px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-[11px] font-medium border border-red-500/20 transition-colors">Eliminar</button>
-                </div>
+                  {/* Botões - Utilizando flex-wrap para quebrarem linha para baixo caso necessário, protegendo a largura */}
+                  <div className="flex flex-wrap items-center justify-center gap-2 shrink-0">
+                    <button onClick={() => openDetails(player)} className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition-colors border border-slate-700/50 shadow-sm">Ficha</button>
+                    <button onClick={() => openForm(player)} className="px-4 py-2 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg text-[11px] font-medium border border-blue-500/20 transition-colors shadow-sm">Editar</button>
+                    <button onClick={() => handleDeleteClick(player.id, player.name)} className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-[11px] font-medium border border-red-500/20 transition-colors shadow-sm">Eliminar</button>
+                  </div>
 
+                </div>
               </div>
             ))}
           </div>
