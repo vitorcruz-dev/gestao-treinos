@@ -26,11 +26,9 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
     const w = canvas.width;
     const h = canvas.height;
 
-    // Fundo do Campo
     ctx.fillStyle = '#0f1523';
     ctx.fillRect(0, 0, w, h);
 
-    // Linhas do Campo
     ctx.strokeStyle = 'rgba(255,255,255,0.2)';
     ctx.lineWidth = 2;
     ctx.strokeRect(30, 30, w - 60, h - 60);
@@ -42,7 +40,6 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
     ctx.arc(w / 2, h / 2, 50, 0, Math.PI * 2);
     ctx.stroke();
     
-    // Pequenas áreas
     ctx.strokeRect(30, h / 2 - 80, 100, 160);
     ctx.strokeRect(w - 130, h / 2 - 80, 100, 160);
   };
@@ -370,34 +367,40 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     );
   }
 
-  // VISTA 2: DETALHES E IMPRESSÃO (AJUSTADO A 100% DA FOLHA A4)
+  // VISTA 2: DETALHES E IMPRESSÃO (AJUSTADO A 100% DA FOLHA A4 PERFEITAMENTE)
   if (view === 'details' && current) {
     const currentExercises = Array.isArray(current.exercises) ? current.exercises : [];
     const validExercises = currentExercises.filter((ex: any) => (ex.title && ex.title.trim() !== '') || (ex.description && ex.description.trim() !== ''));
-
-    // Cálculo dinâmico da altura máxima do canvas para preencher a folha sem transbordar
-    const maxImgHeight = validExercises.length <= 2 ? '240px' : validExercises.length <= 4 ? '190px' : '160px';
 
     return (
       <div className="p-2 md:p-6 max-w-4xl mx-auto">
         <style>
           {`
             @media print {
-              @page { size: A4 portrait; margin: 6mm; }
+              @page { size: A4 portrait; margin: 8mm; }
               body * { visibility: hidden; }
               .printable-a4, .printable-a4 * { visibility: visible; }
-              html, body, #root, main { background: white !important; color: black !important; height: 100% !important; overflow: visible !important; display: block !important; }
               
+              /* Reset da página para evitar scroll ou cortes */
+              html, body, #root, main { 
+                background: white !important; 
+                color: black !important; 
+                height: 100% !important; 
+                overflow: hidden !important; 
+                display: block !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+              }
+              
+              /* Contentor principal da folha A4 */
               .printable-a4 { 
                 position: absolute; 
                 left: 0; 
                 top: 0; 
                 width: 100%; 
-                min-height: 280mm; 
-                height: 280mm; 
+                height: 280mm !important; /* Altura fixa correspondente ao A4 */
                 display: flex !important; 
                 flex-direction: column !important; 
-                justify-content: space-between !important; 
                 background: white !important; 
                 color: black !important; 
                 border: none !important; 
@@ -412,37 +415,70 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
               .print-bg-gray { background-color: #f8fafc !important; }
               .no-print { display: none !important; }
               
-              /* ESTILOS DE PREENCHIMENTO DE FOLHA INTEIRA */
-              .print-header { padding: 14px 18px !important; margin-bottom: 8px !important; }
+              /* ESTRUTURA FLEXÍVEL DE IMPRESSÃO */
+              .print-header { 
+                padding: 10px 15px !important; 
+                margin-bottom: 5px !important; 
+                flex-shrink: 0 !important; 
+              }
+              
               .print-body { 
                 flex: 1 !important; 
                 display: flex !important; 
                 flex-direction: column !important; 
-                justify-content: space-between !important; 
-                padding: 0 16px 12px 16px !important; 
+                padding: 0 15px 5px 15px !important; 
+                height: 100% !important;
+                min-height: 0 !important; 
               }
-              .print-exercises-section { flex: 1 !important; display: flex !important; flex-direction: column !important; }
+              
+              .print-exercises-section { 
+                flex: 1 !important; 
+                display: flex !important; 
+                flex-direction: column !important; 
+                min-height: 0 !important;
+              }
+              
+              /* A GRELHA MÁGICA: Força as linhas a esticarem por igual */
               .print-exercises-grid { 
                 display: grid !important; 
-                grid-template-columns: ${validExercises.length > 1 ? '1fr 1fr' : '1fr'} !important; 
-                gap: 12px !important; 
+                grid-template-columns: ${validExercises.length > 1 ? 'repeat(2, minmax(0, 1fr))' : '1fr'} !important; 
+                grid-auto-rows: minmax(0, 1fr) !important; 
+                gap: 10px !important; 
                 flex: 1 !important; 
-                align-content: space-around !important;
+                min-height: 0 !important;
               }
+              
               .print-exercise-card { 
-                padding: 10px 14px !important; 
+                padding: 8px 12px !important; 
                 margin-bottom: 0 !important; 
                 display: flex !important; 
                 flex-direction: column !important; 
-                justify-content: space-between !important; 
+                height: 100% !important; 
+                box-sizing: border-box !important;
               }
+              
+              /* O container da imagem absorve o resto do cartão */
+              .print-canvas-wrapper {
+                flex: 1 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                min-height: 0 !important; 
+                margin-top: 5px !important;
+              }
+              
+              /* A imagem ajusta-se perfeitamente ao seu container dinâmico */
               .print-canvas-img { 
-                max-height: ${maxImgHeight} !important; 
-                width: 100% !important; 
+                max-height: 100% !important; 
+                max-width: 100% !important; 
                 object-fit: contain !important; 
-                margin: 4px auto 0 auto !important; 
               }
-              .print-notes-card { padding: 10px 14px !important; margin-top: 10px !important; }
+              
+              .print-notes-card { 
+                flex-shrink: 0 !important; 
+                padding: 10px 15px !important; 
+                margin-top: 10px !important; 
+              }
             }
           `}
         </style>
@@ -453,7 +489,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
         </div>
         
         <div className="printable-a4 bg-[#151c2c] rounded-2xl border border-slate-800/60 shadow-xl overflow-hidden min-h-[297mm]">
-          <div className="p-8 border-b border-slate-800/60 print-border-black print-bg-gray print-header">
+          <div className="print-header border-b border-slate-800/60 print-border-black print-bg-gray p-8">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-white print-text-black uppercase tracking-tight">Ficha de Treino</h1>
@@ -471,31 +507,32 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
             </div>
           </div>
 
-          <div className="p-6 space-y-6 print-body">
+          <div className="print-body p-6">
             
             {validExercises.length > 0 && (
-              <div className="space-y-3 print-exercises-section">
+              <div className="print-exercises-section">
                 <h3 className="text-xs font-bold text-slate-200 print-text-black mb-2 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-1">
                   <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
                   Estrutura e Exercícios
                 </h3>
                 
-                {/* GRELHA ADAPTÁVEL E EXPANSÍVEL PARA A4 */}
-                <div className="print-exercises-grid grid grid-cols-1 gap-4">
+                {/* GRELHA ADAPTÁVEL QUE PREENCHE O RESTO DA FOLHA */}
+                <div className="print-exercises-grid">
                   {validExercises.map((ex: any, idx: number) => (
-                    <div key={idx} className="print-exercise-card bg-[#0f1523]/50 print-bg-gray p-4 rounded-xl border border-slate-800/60 print-border-black">
+                    <div key={idx} className="print-exercise-card bg-[#0f1523]/50 print-bg-gray rounded-xl border border-slate-800/60 print-border-black">
                       <div className="flex justify-between items-start mb-1.5">
                         <h4 className="text-sm font-bold text-white print-text-black">{idx + 1}. {ex.title || ex.name || 'Exercício'}</h4>
                         {ex.duration && <span className="text-[10px] font-bold text-slate-400 print-text-gray bg-slate-800/50 print-bg-gray px-2 py-0.5 rounded">⏳ {ex.duration} min</span>}
                       </div>
                       
                       {ex.description && (
-                        <p className="text-xs text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed mb-2">{ex.description}</p>
+                        <p className="text-xs text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed">{ex.description}</p>
                       )}
                       
+                      {/* O ENVOLVÓCRIO DA IMAGEM ESTICA PARA PREENCHER A CAIXA */}
                       {(ex as any).board_image && (
-                        <div className="w-full flex justify-center bg-[#090e17] rounded-lg overflow-hidden border border-slate-700/50 print-border-black mt-1">
-                          <img src={(ex as any).board_image} alt={`Tática ${idx + 1}`} className="print-canvas-img max-h-[180px] w-full object-contain" />
+                        <div className="print-canvas-wrapper bg-[#090e17] rounded-lg overflow-hidden border border-slate-700/50 print-border-black">
+                          <img src={(ex as any).board_image} alt={`Tática ${idx + 1}`} className="print-canvas-img" />
                         </div>
                       )}
                     </div>
@@ -505,12 +542,12 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
             )}
 
             {current.finalAppreciation && (
-              <div className="print-notes-card mt-4">
+              <div className="print-notes-card">
                 <h3 className="text-xs font-bold text-slate-200 print-text-black mb-2 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-1">
                   <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
                   Observações Finais
                 </h3>
-                <div className="bg-[#0f1523]/50 print-bg-gray p-3.5 rounded-xl border border-slate-800/60 print-border-black">
+                <div className="bg-[#0f1523]/50 print-bg-gray p-3 rounded-xl border border-slate-800/60 print-border-black">
                   <p className="text-xs text-slate-300 print-text-black whitespace-pre-wrap leading-relaxed">{current.finalAppreciation}</p>
                 </div>
               </div>
