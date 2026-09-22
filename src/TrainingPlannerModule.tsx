@@ -436,7 +436,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
                       </div>
                       <p className="text-sm text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed mb-4">{ex.description || 'Sem descrição.'}</p>
                       
-                      {/* CORREÇÃO AQUI: Cast para (ex as any).board_image evita o erro TS2339 */}
+                      {/* Cast para (ex as any).board_image para evitar erros de compilação estrita */}
                       {(ex as any).board_image && (
                         <div className="w-full flex justify-center bg-[#090e17] rounded-xl overflow-hidden border border-slate-700/50 print-border-black mt-2">
                           <img src={(ex as any).board_image} alt={`Tática ${idx + 1}`} className="max-h-[300px] w-full object-contain" />

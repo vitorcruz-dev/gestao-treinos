@@ -1,29 +1,75 @@
-export type UserRole = 
-  | 'Administrador' | 'Treinador Adjunto' | 'Treinador de Guarda Redes' | 'Observador' | 'Preparador Físico';
-
-export interface StaffMember { id: string; username: string; password?: string; name: string; age: string; address: string; phone: string; role: UserRole; }
-export interface Team { id: string; year: string; club: string; name: string; }
-export interface Player { id: string; teamId: string; name: string; age: string; position: 'GR' | 'DEF' | 'MED' | 'AVA'; preferredFoot: 'Direito' | 'Esquerdo' | 'Ambidestro'; birthDate: string; notes: string; photoUrl?: string; }
-export interface TrainingEvaluation { id: string; playerId: string; date: string; performance: number; strengths: string; weaknesses: string; observations: string; }
-export interface IndividualMatchEval { playerId: string; status: 'Titular' | 'Suplente' | 'Fora'; minutesPlayed: number; rating: number; positives: string; negatives: string; }
-export interface GoalScored { id: string; minute: number; scorerId: string; assistId?: string; }
-export interface GoalConceded { id: string; minute: number; corridor: 'Direito' | 'Centro' | 'Esquerdo'; }
-export interface MatchReport { id: string; teamId: string; date: string; opponent: string; oppTacticalSystem: string; oppBehaviorWinning: string; oppBehaviorLosing: string; oppSubstitutions: string; oppSetPieces: string; oppFinalEval: string; ownInitialSystem: string; ownFinalSystem: string; ownTeamPositives: string; ownTeamNegatives: string; goalsScored: GoalScored[]; goalsConceded: GoalConceded[]; individualEvals: IndividualMatchEval[]; }
-export interface FutureOpponentScouting { id: string; teamId: string; opponentName: string; observationDate: string; tacticalModel: string; behaviorWinning: string; behaviorLosing: string; substitutionsImpact: string; setPieces: string; setPiecesPhotoUrl?: string; strengths: string; weaknesses: string; strongPlayers: string; weakPlayers: string; observations: string; }
-
-// NOVO: Planeamento de Treinos
-export interface CanvasItem {
+export interface StaffMember {
   id: string;
-  type: 'blue' | 'red' | 'yellow' | 'green' | 'cone' | 'goal' | 'barrier' | 'ball' | 'player_home' | 'player_away';
-  x: number;
-  y: number;
+  username: string;
+  password?: string;
+  name: string;
+  age?: number;
+  address?: string;
+  phone?: string;
+  role: string;
+  must_change_password?: boolean;
+}
+
+export interface Team {
+  id: string;
+  year: string;
+  club: string;
+  name: string;
+}
+
+export interface WeightRecord {
+  date: string;
+  weight: number;
+}
+
+export interface Player {
+  id: string;
+  teamId: string;
+  name: string;
+  age?: number | string;
+  position: string;
+  preferredFoot: string;
+  birthDate?: string;
+  notes?: string;
+  photoUrl?: string;
+  height?: number | string;
+  weight?: number | string;
+  weight_history?: WeightRecord[];
+}
+
+export interface IndividualEval {
+  playerId: string;
+  rating: number; // ex: 1 a 5 ou 1 a 10
+  notes?: string;
+}
+
+export interface MatchReport {
+  id: string;
+  teamId: string;
+  date: string;
+  opponent: string;
+  oppTacticalSystem?: string;
+  oppBehaviorWinning?: string;
+  oppBehaviorLosing?: string;
+  oppSubstitutions?: string;
+  oppSetPieces?: string;
+  oppFinalEval?: string;
+  ownInitialSystem?: string;
+  ownFinalSystem?: string;
+  ownTeamPositives?: string;
+  ownTeamNegatives?: string;
+  goalsScored?: number;
+  goalsConceded?: number;
+  individualEvals?: IndividualEval[];
 }
 
 export interface ExercisePlan {
-  title: string;
-  duration: number;
-  description: string;
-  canvasItems: CanvasItem[];
+  id?: string;
+  title?: string;
+  name?: string;
+  duration?: string;
+  description?: string;
+  board_image?: string; // Suporte para o Quadro Tático por exercício
 }
 
 export interface TrainingPlan {
@@ -31,6 +77,25 @@ export interface TrainingPlan {
   teamId: string;
   date: string;
   theme: string;
-  exercises: ExercisePlan[]; // Terá sempre os 5 exercícios definidos
-  finalAppreciation: string;
+  exercises?: ExercisePlan[];
+  finalAppreciation?: string;
+  board_image?: string;
+}
+
+export interface FutureOpponentScouting {
+  id: string;
+  teamId: string;
+  opponentName: string;
+  observationDate: string;
+  tacticalModel?: string;
+  behaviorWinning?: string;
+  behaviorLosing?: string;
+  substitutionsImpact?: string;
+  setPieces?: string;
+  setPiecesPhotoUrl?: string;
+  strengths?: string;
+  weaknesses?: string;
+  strongPlayers?: string;
+  weakPlayers?: string;
+  observations?: string;
 }
