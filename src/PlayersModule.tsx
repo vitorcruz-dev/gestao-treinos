@@ -21,7 +21,6 @@ interface PlayerExtended {
   weight_history: WeightRecord[];
 }
 
-// A CULPADA ESTAVA AQUI! Agora estão só os parênteses vazios.
 export default function PlayersModule() {
   const [extPlayers, setExtPlayers] = useState<PlayerExtended[]>([]);
   const [view, setView] = useState<'grid' | 'form' | 'details'>('grid');
@@ -58,7 +57,6 @@ export default function PlayersModule() {
     const fd = new FormData(e.currentTarget);
     const newWeight = Number(fd.get('weight'));
 
-    // Lógica do Histórico de Peso
     let history = current?.weight_history || [];
     if (newWeight && newWeight !== Number(current?.weight)) {
       history = [...history, { date: new Date().toISOString().split('T')[0], weight: newWeight }];
@@ -84,7 +82,6 @@ export default function PlayersModule() {
       } else {
         await supabase.from('players').insert([payload]);
       }
-      
       window.location.reload();
     } catch (err: any) {
       alert("Erro ao guardar: " + err.message);
@@ -111,6 +108,7 @@ export default function PlayersModule() {
     setView('details');
   };
 
+  // VISTA EM LISTA (PLANTEL)
   if (view === 'grid') {
     return (
       <div className="p-2 md:p-6 max-w-7xl mx-auto">
@@ -133,47 +131,52 @@ export default function PlayersModule() {
             <p className="text-slate-400 mt-2">Adicione o seu primeiro jogador à equipa.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="flex flex-col gap-3">
             {extPlayers.map(player => (
-              <div key={player.id} className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-lg hover:border-slate-500 transition-colors flex flex-col">
-                <div className="h-32 bg-slate-900 flex justify-center items-end pb-4 relative">
-                  <div className="absolute top-3 left-3 bg-slate-800 text-slate-300 text-xs px-2 py-1 rounded-md border border-slate-700 font-bold">
-                    {player.position}
-                  </div>
+              <div key={player.id} className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col md:flex-row items-center gap-4 hover:border-slate-500 transition-colors shadow-sm relative">
+                
+                {/* Foto / Avatar */}
+                <div className="shrink-0 relative">
                   {player.photo_url ? (
-                    <img src={player.photo_url} alt={player.name} className="w-20 h-20 rounded-full object-cover border-4 border-slate-800 shadow-lg" />
+                    <img src={player.photo_url} alt={player.name} className="w-14 h-14 rounded-full object-cover border-2 border-slate-700 shadow-md" />
                   ) : (
-                    <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center text-white text-2xl font-black border-4 border-slate-800 shadow-lg">
+                    <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-black border-2 border-slate-700 shadow-md">
                       {player.name.charAt(0)}
                     </div>
                   )}
                 </div>
-                <div className="p-5 flex-1 flex flex-col text-center">
-                  <h3 className="text-lg font-black text-white mb-1">{player.name}</h3>
-                  <div className="flex justify-center gap-3 text-xs font-semibold text-slate-400 mb-4">
-                    <span>{player.age ? `${player.age} anos` : 'Idade N/D'}</span>
-                    <span>•</span>
-                    <span>Pé {player.preferred_foot}</span>
-                  </div>
-                  
-                  <div className="flex justify-center gap-4 mb-6 bg-slate-900/50 p-2 rounded-lg border border-slate-700">
-                    <div className="text-center">
-                      <span className="block text-[10px] text-slate-500 uppercase tracking-wider">Altura</span>
-                      <span className="font-bold text-slate-300">{player.height ? `${player.height}m` : '-'}</span>
-                    </div>
-                    <div className="w-px bg-slate-700"></div>
-                    <div className="text-center">
-                      <span className="block text-[10px] text-slate-500 uppercase tracking-wider">Peso</span>
-                      <span className="font-bold text-slate-300">{player.weight ? `${player.weight}kg` : '-'}</span>
-                    </div>
-                  </div>
 
-                  <div className="mt-auto grid grid-cols-3 gap-2">
-                    <button onClick={() => openDetails(player)} className="col-span-3 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-bold transition-colors">Ver Ficha</button>
-                    <button onClick={() => openForm(player)} className="col-span-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white py-2 rounded-lg text-sm font-bold border border-blue-500/20 transition-all">Editar</button>
-                    <button onClick={() => handleDelete(player.id, player.name)} className="col-span-1 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white py-2 rounded-lg text-sm font-bold border border-red-500/20 transition-all">🗑️</button>
+                {/* Info (Nome, Posição) */}
+                <div className="flex-1 min-w-0 text-center md:text-left w-full">
+                  <h3 className="text-lg font-black text-white truncate" title={player.name}>{player.name}</h3>
+                  <span className="text-xs font-bold text-blue-400 uppercase tracking-wide truncate block" title={player.position}>{player.position}</span>
+                </div>
+                
+                {/* Atributos do Jogador */}
+                <div className="flex items-center justify-center md:justify-end gap-3 w-full md:w-auto bg-slate-900/50 md:bg-transparent p-3 md:p-0 rounded-xl border border-slate-700 md:border-none shrink-0">
+                  <div className="text-center px-2">
+                    <span className="block text-[10px] text-slate-500 font-bold uppercase">Idade</span>
+                    <span className="font-bold text-slate-300 text-sm">{player.age ? `${player.age}A` : '-'}</span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-700"></div>
+                  <div className="text-center px-2">
+                    <span className="block text-[10px] text-slate-500 font-bold uppercase">Pé</span>
+                    <span className="font-bold text-slate-300 text-sm">{player.preferred_foot.substring(0, 3)}</span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-700"></div>
+                  <div className="text-center px-2">
+                    <span className="block text-[10px] text-slate-500 font-bold uppercase">Alt/Peso</span>
+                    <span className="font-bold text-slate-300 text-sm">{player.height ? `${player.height}m` : '-'}/{player.weight ? `${player.weight}kg` : '-'}</span>
                   </div>
                 </div>
+
+                {/* Ações */}
+                <div className="flex gap-2 w-full md:w-auto shrink-0 justify-center mt-3 md:mt-0">
+                  <button onClick={() => openDetails(player)} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-bold transition-colors">Ficha</button>
+                  <button onClick={() => openForm(player)} className="px-4 py-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg text-xs font-bold border border-blue-500/20 transition-all">Editar</button>
+                  <button onClick={() => handleDelete(player.id, player.name)} className="px-3 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-xs font-bold border border-red-500/20 transition-all">🗑️</button>
+                </div>
+
               </div>
             ))}
           </div>
@@ -182,6 +185,7 @@ export default function PlayersModule() {
     );
   }
 
+  // VISTA 2: DETALHES DO JOGADOR
   if (view === 'details' && current) {
     return (
       <div className="p-2 md:p-6 max-w-4xl mx-auto">
@@ -197,9 +201,9 @@ export default function PlayersModule() {
               </div>
             )}
             
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <div className="bg-slate-700 inline-block px-3 py-1 rounded-lg text-sm font-bold text-slate-300 mb-3">{current.position}</div>
-              <h1 className="text-3xl md:text-5xl font-black text-white mb-4">{current.name}</h1>
+              <h1 className="text-3xl md:text-5xl font-black text-white mb-4 truncate" title={current.name}>{current.name}</h1>
               <div className="flex flex-wrap gap-4 text-sm font-semibold text-slate-400">
                 <span className="bg-slate-900 px-3 py-1.5 rounded-lg">Idade: {current.age || 'N/D'}</span>
                 <span className="bg-slate-900 px-3 py-1.5 rounded-lg">Pé: {current.preferred_foot}</span>
@@ -253,6 +257,7 @@ export default function PlayersModule() {
     );
   }
 
+  // VISTA 3: FORMULÁRIO (CRIAR / EDITAR)
   return (
     <div className="p-2 md:p-6 max-w-4xl mx-auto">
       <div className="bg-slate-800 p-6 md:p-10 rounded-3xl border border-slate-700 shadow-xl">

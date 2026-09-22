@@ -1,47 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 
-interface StaffMemberExtended {
-  id: string;
-  name: string;
-  role: string;
-  username: string;
-  password?: string;
-  phone?: string;
-  address?: string;
-  age?: number;
+interface WeightRecord {
+  date: string;
+  weight: number;
 }
 
-export default function AdminModule() {
-  const [staffList, setStaffList] = useState<StaffMemberExtended[]>([]);
-  const [view, setView] = useState<'list' | 'form'>('list');
-  const [current, setCurrent] = useState<StaffMemberExtended | null>(null);
+interface PlayerExtended {
+  id: string;
+  team_id: string;
+  name: string;
+  age: number | string;
+  position: string;
+  preferred_foot: string;
+  birth_date: string;
+  notes: string;
+  photo_url: string;
+  height: number | string;
+  weight: number | string;
+  weight_history: WeightRecord[];
+}
+
+export default function PlayersModule() {
+  const [extPlayers, setExtPlayers] = useState<PlayerExtended[]>([]);
+  const [view, setView] = useState<'grid' | 'form' | 'details'>('grid');
+  const [current, setCurrent] = useState<PlayerExtended | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ESTADO DO MODAL PERSONALIZADO
-  const [modal, setModal] = useState<{
-    show: boolean;
-    title: string;
-    message: string;
-    onConfirm: (() => void) | null;
-    type: 'alert' | 'confirm';
-  }>({ show: false, title: '', message: '', onConfirm: null, type: 'alert' });
+  const activeTeam = JSON.parse(localStorage.getItem('scoutpro_active_team') || '{}');
 
-  // Vai buscar o staff ativo (para saber quem não se pode auto-eliminar)
-  const currentUser = JSON.parse(localStorage.getItem('scoutpro_user') || '{}');
-
-  const fetchStaff = async () => {
+  const fetchPlayers = async () => {
+    if (!activeTeam.id) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('staff')
+        .from('players')
         .select('*')
-        .order('role')
+        .eq('team_id', activeTeam.id)
+        .order('position')
         .order('name');
-      
       if (error) throw error;
-      if (data) setStaffList(data);
-    } catch (err: any) {
+      if (data) setExtPlayers(data);
+    } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
@@ -49,174 +49,134 @@ export default function AdminModule() {
   };
 
   useEffect(() => {
-    fetchStaff();
-  }, []);
-
-  // Controladores do Modal
-  const openAlert = (title: string, message: string) => {
-    setModal({ show: true, title, message, onConfirm: null, type: 'alert' });
-  };
-
-  const openConfirm = (title: string, message: string, onConfirm: () => void) => {
-    setModal({ show: true, title, message, onConfirm, type: 'confirm' });
-  };
-
-  const closeModal = () => {
-    setModal(prev => ({ ...prev, show: false }));
-  };
+    fetchPlayers();
+  }, [activeTeam.id]);
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    
+    const newWeight = Number(fd.get('weight'));
+
+    let history = current?.weight_history || [];
+    if (newWeight && newWeight !== Number(current?.weight)) {
+      history = [...history, { date: new Date().toISOString().split('T')[0], weight: newWeight }];
+    }
+
     const payload = {
-      name: fd.get('name') as string,
-      role: fd.get('role') as string,
-      username: fd.get('username') as string,
-      password: fd.get('password') as string,
-      phone: fd.get('phone') as string,
-      address: fd.get('address') as string,
-      age: Number(fd.get('age')) || null,
+      team_id: activeTeam.id,
+      name: fd.get('name'),
+      age: fd.get('age') || null,
+      position: fd.get('position'),
+      preferred_foot: fd.get('preferred_foot'),
+      birth_date: fd.get('birth_date') || null,
+      photo_url: fd.get('photo_url'),
+      notes: fd.get('notes'),
+      height: fd.get('height') || null,
+      weight: newWeight || null,
+      weight_history: history
     };
 
     try {
       if (current?.id) {
-        const { error } = await supabase.from('staff').update(payload).eq('id', current.id);
-        if (error) throw error;
+        await supabase.from('players').update(payload).eq('id', current.id);
       } else {
-        const { error } = await supabase.from('staff').insert([payload]);
-        if (error) throw error;
+        await supabase.from('players').insert([payload]);
       }
-      
       window.location.reload();
     } catch (err: any) {
-      openAlert("Erro", `Erro ao guardar: ${err.message}`);
+      alert("Erro ao guardar: " + err.message);
     }
   };
 
-  const handleDeleteClick = (id: string, name: string) => {
-    if (id === currentUser.id) {
-      openAlert("Ação não permitida", "Não pode eliminar a sua própria conta de administrador!");
-      return;
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Tem a certeza que quer eliminar ${name} do plantel?`)) return;
+    try {
+      await supabase.from('players').delete().eq('id', id);
+      window.location.reload();
+    } catch (err: any) {
+      alert("Erro ao eliminar: " + err.message);
     }
-    
-    openConfirm(
-      "Eliminar Acesso",
-      `Tem a certeza que deseja eliminar o acesso de ${name}? Esta ação não pode ser revertida.`,
-      async () => {
-        try {
-          const { error } = await supabase.from('staff').delete().eq('id', id);
-          if (error) throw error;
-          window.location.reload();
-        } catch (err: any) {
-          openAlert("Erro", `Erro ao eliminar: ${err.message}`);
-        }
-      }
-    );
   };
 
-  const openForm = (staff: StaffMemberExtended | null = null) => {
-    setCurrent(staff);
+  const openForm = (player: PlayerExtended | null = null) => {
+    setCurrent(player);
     setView('form');
   };
 
-  // COMPONENTE DO MODAL
-  const renderModal = () => {
-    if (!modal.show) return null;
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 md:p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
-          <h3 className="text-xl font-black text-white mb-2">{modal.title}</h3>
-          <p className="text-slate-300 mb-8">{modal.message}</p>
-
-          <div className="flex gap-3 justify-end">
-            {modal.type === 'confirm' && (
-              <button onClick={closeModal} className="px-5 py-2.5 rounded-xl font-bold text-slate-300 bg-slate-700 hover:bg-slate-600 transition-colors">
-                Cancelar
-              </button>
-            )}
-            <button 
-              onClick={() => {
-                if (modal.onConfirm) modal.onConfirm();
-                else closeModal();
-              }}
-              className={`px-5 py-2.5 rounded-xl font-bold text-white transition-colors ${
-                modal.type === 'confirm' ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'
-              }`}
-            >
-              {modal.type === 'confirm' ? 'Eliminar' : 'OK'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+  const openDetails = (player: PlayerExtended) => {
+    setCurrent(player);
+    setView('details');
   };
 
-  if (view === 'list') {
+  // VISTA EM LISTA (PLANTEL)
+  if (view === 'grid') {
     return (
-      <div className="p-2 md:p-6 max-w-7xl mx-auto relative">
-        
-        {/* Renderiza o Popup Customizado */}
-        {renderModal()}
-
+      <div className="p-2 md:p-6 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h2 className="text-2xl md:text-3xl font-black text-white">Equipa Técnica</h2>
-            <p className="text-slate-400">Gira as credenciais, dados e permissões do seu staff.</p>
+            <h2 className="text-2xl md:text-3xl font-black text-white">Plantel</h2>
+            <p className="text-slate-400">Gira os seus atletas, avalie o peso e atualize os dados.</p>
           </div>
           <button onClick={() => openForm()} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-500 shadow-md transition-colors flex gap-2 items-center">
-            <span>+</span> Novo Membro
+            <span>+</span> Novo Jogador
           </button>
         </div>
 
         {loading ? (
-          <p className="text-slate-400">A carregar acessos...</p>
-        ) : staffList.length === 0 ? (
+          <p className="text-slate-400">A carregar plantel...</p>
+        ) : extPlayers.length === 0 ? (
           <div className="bg-slate-800 p-10 rounded-2xl border border-slate-700 text-center">
-            <h3 className="text-white font-bold text-lg">Sem Staff</h3>
-            <p className="text-slate-400 mt-2">Adicione membros para lhes dar acesso à plataforma.</p>
+            <span className="text-4xl mb-4 block">👕</span>
+            <h3 className="text-white font-bold text-lg">Plantel Vazio</h3>
+            <p className="text-slate-400 mt-2">Adicione o seu primeiro jogador à equipa.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {staffList.map(member => (
-              <div key={member.id} className={`bg-slate-800 p-6 rounded-2xl border ${member.id === currentUser.id ? 'border-blue-500/50 shadow-blue-900/20' : 'border-slate-700'} shadow-lg hover:border-slate-500 transition-colors relative flex flex-col h-full`}>
+          <div className="flex flex-col gap-3">
+            {extPlayers.map(player => (
+              <div key={player.id} className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col md:flex-row items-center gap-4 hover:border-slate-500 transition-colors shadow-sm relative">
                 
-                {member.id === currentUser.id && (
-                  <div className="absolute top-4 right-4 bg-blue-600 text-white text-[10px] font-black uppercase px-2 py-1 rounded-md z-10">Você</div>
-                )}
-                
-                {/* CORREÇÃO DO LAYOUT (min-w-0, shrink-0, truncate) */}
-                <div className="flex items-center gap-4 mb-5">
-                  <div className="w-14 h-14 shrink-0 rounded-full bg-slate-700 flex items-center justify-center text-xl font-black text-white shadow-inner">
-                    {member.name.substring(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-black text-white leading-tight truncate" title={member.name}>{member.name}</h3>
-                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wide block truncate" title={member.role}>{member.role}</span>
-                  </div>
-                </div>
-                
-                <div className="space-y-2 mb-6 flex-1">
-                  <p className="text-sm text-slate-400 flex items-center gap-2">
-                    <span className="shrink-0">📧</span> <span className="font-semibold text-slate-300 truncate">{member.username}</span>
-                  </p>
-                  <p className="text-sm text-slate-400 flex items-center gap-2">
-                    <span className="shrink-0">📱</span> <span className="truncate">{member.phone || 'Sem contacto'}</span>
-                  </p>
+                {/* Foto / Avatar */}
+                <div className="shrink-0 relative">
+                  {player.photo_url ? (
+                    <img src={player.photo_url} alt={player.name} className="w-14 h-14 rounded-full object-cover border-2 border-slate-700 shadow-md" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-black border-2 border-slate-700 shadow-md">
+                      {player.name.charAt(0)}
+                    </div>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mt-auto">
-                  <button onClick={() => openForm(member)} className="bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-bold transition-colors">
-                    Editar
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteClick(member.id, member.name)} 
-                    disabled={member.id === currentUser.id}
-                    className={`py-2 rounded-lg text-sm font-bold border transition-all ${member.id === currentUser.id ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed' : 'bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border-red-500/20'}`}
-                  >
-                    Eliminar
-                  </button>
+                {/* Info (Nome, Posição) */}
+                <div className="flex-1 min-w-0 text-center md:text-left w-full">
+                  <h3 className="text-lg font-black text-white truncate" title={player.name}>{player.name}</h3>
+                  <span className="text-xs font-bold text-blue-400 uppercase tracking-wide truncate block" title={player.position}>{player.position}</span>
                 </div>
+                
+                {/* Atributos do Jogador */}
+                <div className="flex items-center justify-center md:justify-end gap-3 w-full md:w-auto bg-slate-900/50 md:bg-transparent p-3 md:p-0 rounded-xl border border-slate-700 md:border-none shrink-0">
+                  <div className="text-center px-2">
+                    <span className="block text-[10px] text-slate-500 font-bold uppercase">Idade</span>
+                    <span className="font-bold text-slate-300 text-sm">{player.age ? `${player.age}A` : '-'}</span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-700"></div>
+                  <div className="text-center px-2">
+                    <span className="block text-[10px] text-slate-500 font-bold uppercase">Pé</span>
+                    <span className="font-bold text-slate-300 text-sm">{player.preferred_foot.substring(0, 3)}</span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-700"></div>
+                  <div className="text-center px-2">
+                    <span className="block text-[10px] text-slate-500 font-bold uppercase">Alt/Peso</span>
+                    <span className="font-bold text-slate-300 text-sm">{player.height ? `${player.height}m` : '-'}/{player.weight ? `${player.weight}kg` : '-'}</span>
+                  </div>
+                </div>
+
+                {/* Ações */}
+                <div className="flex gap-2 w-full md:w-auto shrink-0 justify-center mt-3 md:mt-0">
+                  <button onClick={() => openDetails(player)} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-bold transition-colors">Ficha</button>
+                  <button onClick={() => openForm(player)} className="px-4 py-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg text-xs font-bold border border-blue-500/20 transition-all">Editar</button>
+                  <button onClick={() => handleDelete(player.id, player.name)} className="px-3 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-xs font-bold border border-red-500/20 transition-all">🗑️</button>
+                </div>
+
               </div>
             ))}
           </div>
@@ -225,70 +185,150 @@ export default function AdminModule() {
     );
   }
 
+  // VISTA 2: DETALHES DO JOGADOR
+  if (view === 'details' && current) {
+    return (
+      <div className="p-2 md:p-6 max-w-4xl mx-auto">
+        <button onClick={() => setView('grid')} className="text-blue-400 font-bold mb-6 hover:text-blue-300">← Voltar ao Plantel</button>
+        
+        <div className="bg-slate-800 rounded-3xl border border-slate-700 overflow-hidden shadow-xl">
+          <div className="p-8 md:p-10 flex flex-col md:flex-row gap-8 items-start border-b border-slate-700">
+            {current.photo_url ? (
+              <img src={current.photo_url} alt={current.name} className="w-32 h-32 md:w-40 md:h-40 rounded-2xl object-cover shadow-lg border-4 border-slate-700" />
+            ) : (
+              <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-5xl font-black shadow-lg">
+                {current.name.charAt(0)}
+              </div>
+            )}
+            
+            <div className="flex-1 min-w-0">
+              <div className="bg-slate-700 inline-block px-3 py-1 rounded-lg text-sm font-bold text-slate-300 mb-3">{current.position}</div>
+              <h1 className="text-3xl md:text-5xl font-black text-white mb-4 truncate" title={current.name}>{current.name}</h1>
+              <div className="flex flex-wrap gap-4 text-sm font-semibold text-slate-400">
+                <span className="bg-slate-900 px-3 py-1.5 rounded-lg">Idade: {current.age || 'N/D'}</span>
+                <span className="bg-slate-900 px-3 py-1.5 rounded-lg">Pé: {current.preferred_foot}</span>
+                <span className="bg-slate-900 px-3 py-1.5 rounded-lg">Nascimento: {current.birth_date ? new Date(current.birth_date).toLocaleDateString('pt-PT') : 'N/D'}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <h3 className="text-xl font-bold text-white mb-4">Evolução do Peso</h3>
+              <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <span className="block text-xs text-slate-500 uppercase font-bold">Peso Atual</span>
+                    <span className="text-2xl font-black text-white">{current.weight ? `${current.weight} kg` : '--'}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-xs text-slate-500 uppercase font-bold">Altura</span>
+                    <span className="text-2xl font-black text-white">{current.height ? `${current.height} m` : '--'}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800 pt-4">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Histórico na Época</h4>
+                  {(current.weight_history || []).length > 0 ? (
+                    <div className="space-y-3">
+                      {current.weight_history.map((record, i) => (
+                        <div key={i} className="flex justify-between items-center text-sm bg-slate-800 px-4 py-2 rounded-lg border border-slate-700/50">
+                          <span className="text-slate-400">{new Date(record.date).toLocaleDateString('pt-PT')}</span>
+                          <span className="font-bold text-blue-400">{record.weight} kg</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500 italic">Sem registos anteriores de peso.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-bold text-white mb-4">Notas da Equipa Técnica</h3>
+              <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 h-full min-h-[200px]">
+                <p className="text-slate-300 whitespace-pre-wrap">{current.notes || 'Nenhuma nota registada para este jogador.'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // VISTA 3: FORMULÁRIO (CRIAR / EDITAR)
   return (
     <div className="p-2 md:p-6 max-w-4xl mx-auto">
       <div className="bg-slate-800 p-6 md:p-10 rounded-3xl border border-slate-700 shadow-xl">
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-black text-white">{current ? 'Editar Membro' : 'Novo Membro da Equipa Técnica'}</h2>
-          <button onClick={() => setView('list')} className="text-slate-400 hover:text-white font-bold">✕ Cancelar</button>
+          <h2 className="text-2xl font-black text-white">{current ? 'Editar Jogador' : 'Novo Jogador'}</h2>
+          <button onClick={() => setView('grid')} className="text-slate-400 hover:text-white font-bold">✕ Cancelar</button>
         </div>
 
         <form onSubmit={handleSave} className="space-y-6">
-          
-          <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-700">
-            <h3 className="text-blue-400 font-bold mb-4 uppercase text-xs tracking-wider">Credenciais de Acesso</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Email (Login) *</label>
-                <input required type="email" name="username" defaultValue={current?.username} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Password *</label>
-                <input required type="text" name="password" defaultValue={current?.password} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••" />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-bold text-slate-300 mb-2">Nome Completo *</label>
+              <input required type="text" name="name" defaultValue={current?.name} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-300 mb-2">Posição *</label>
+              <select name="position" defaultValue={current?.position || 'Guarda-Redes'} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                <option>Guarda-Redes</option>
+                <option>Defesa Central</option>
+                <option>Defesa Lateral</option>
+                <option>Médio Defensivo</option>
+                <option>Médio Centro</option>
+                <option>Médio Ofensivo</option>
+                <option>Extremo</option>
+                <option>Avançado Centro</option>
+              </select>
             </div>
           </div>
 
-          <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-700">
-            <h3 className="text-blue-400 font-bold mb-4 uppercase text-xs tracking-wider">Perfil</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Nome Completo *</label>
-                <input required type="text" name="name" defaultValue={current?.name} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Cargo *</label>
-                <select required name="role" defaultValue={current?.role || 'Treinador Adjunto'} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option>Administrador</option>
-                  <option>Treinador Principal</option>
-                  <option>Treinador Adjunto</option>
-                  <option>Treinador de Guarda-Redes</option>
-                  <option>Preparador Físico</option>
-                  <option>Observador / Scout</option>
-                  <option>Fisioterapeuta</option>
-                  <option>Diretor</option>
-                </select>
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="col-span-1">
+              <label className="block text-sm font-bold text-slate-300 mb-2">Idade</label>
+              <input type="number" name="age" defaultValue={current?.age} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
+            <div className="col-span-1">
+              <label className="block text-sm font-bold text-slate-300 mb-2">Nascimento</label>
+              <input type="date" name="birth_date" defaultValue={current?.birth_date} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-bold text-slate-300 mb-2">Pé Preferencial</label>
+              <select name="preferred_foot" defaultValue={current?.preferred_foot || 'Destro'} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                <option>Destro</option>
+                <option>Esquerdino</option>
+                <option>Ambidestro</option>
+              </select>
+            </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-              <div className="col-span-1">
-                <label className="block text-sm font-bold text-slate-300 mb-2">Telemóvel</label>
-                <input type="text" name="phone" defaultValue={current?.phone} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: 912 345 678" />
-              </div>
-              <div className="col-span-1">
-                <label className="block text-sm font-bold text-slate-300 mb-2">Idade</label>
-                <input type="number" name="age" defaultValue={current?.age} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
-              <div className="col-span-3">
-                <label className="block text-sm font-bold text-slate-300 mb-2">Morada</label>
-                <input type="text" name="address" defaultValue={current?.address} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
+          <div className="grid grid-cols-2 gap-6 bg-slate-900/50 p-6 rounded-2xl border border-slate-700">
+            <div>
+              <label className="block text-sm font-bold text-slate-300 mb-2">Altura (m) <span className="text-slate-500 font-normal">Ex: 1.85</span></label>
+              <input type="number" step="0.01" name="height" defaultValue={current?.height} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="1.85" />
             </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-300 mb-2">Peso (kg) <span className="text-slate-500 font-normal">Ex: 75.5</span></label>
+              <input type="number" step="0.1" name="weight" defaultValue={current?.weight} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="75.5" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-300 mb-2">URL da Foto (Opcional)</label>
+            <input type="url" name="photo_url" defaultValue={current?.photo_url} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://..." />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-300 mb-2">Notas Rápidas</label>
+            <textarea name="notes" defaultValue={current?.notes} rows={4} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none custom-scrollbar" placeholder="Anotações sobre comportamento, lesões..."></textarea>
           </div>
 
           <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg transition-colors text-lg mt-4">
-            {current ? 'Atualizar Membro' : 'Criar Acesso'}
+            {current ? 'Guardar Alterações' : 'Adicionar ao Plantel'}
           </button>
         </form>
       </div>
