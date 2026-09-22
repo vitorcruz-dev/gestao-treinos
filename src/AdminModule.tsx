@@ -12,9 +12,7 @@ interface StaffMemberExtended {
   age?: number;
 }
 
-// Aceita props de forma invisível para não dar erro no App.tsx, 
-// mas vai buscar os dados diretamente ao Supabase para ser autónomo.
-export default function AdminModule(props: any) {
+export default function AdminModule() {
   const [staffList, setStaffList] = useState<StaffMemberExtended[]>([]);
   const [view, setView] = useState<'list' | 'form'>('list');
   const [current, setCurrent] = useState<StaffMemberExtended | null>(null);
@@ -61,16 +59,13 @@ export default function AdminModule(props: any) {
 
     try {
       if (current?.id) {
-        // Atualizar existente
         const { error } = await supabase.from('staff').update(payload).eq('id', current.id);
         if (error) throw error;
       } else {
-        // Criar novo
         const { error } = await supabase.from('staff').insert([payload]);
         if (error) throw error;
       }
       
-      // Sincronização invisível global
       window.location.reload();
     } catch (err: any) {
       alert(`Erro ao guardar: ${err.message}`);
@@ -99,9 +94,6 @@ export default function AdminModule(props: any) {
     setView('form');
   };
 
-  // ==========================================
-  // VISTA 1: GRELHA DE STAFF
-  // ==========================================
   if (view === 'list') {
     return (
       <div className="p-2 md:p-6 max-w-7xl mx-auto">
@@ -170,9 +162,6 @@ export default function AdminModule(props: any) {
     );
   }
 
-  // ==========================================
-  // VISTA 2: FORMULÁRIO (CRIAR / EDITAR)
-  // ==========================================
   return (
     <div className="p-2 md:p-6 max-w-4xl mx-auto">
       <div className="bg-slate-800 p-6 md:p-10 rounded-3xl border border-slate-700 shadow-xl">
@@ -183,7 +172,6 @@ export default function AdminModule(props: any) {
 
         <form onSubmit={handleSave} className="space-y-6">
           
-          {/* SECÇÃO 1: ACESSO */}
           <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-700">
             <h3 className="text-blue-400 font-bold mb-4 uppercase text-xs tracking-wider">Credenciais de Acesso</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -198,7 +186,6 @@ export default function AdminModule(props: any) {
             </div>
           </div>
 
-          {/* SECÇÃO 2: DADOS PESSOAIS */}
           <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-700">
             <h3 className="text-blue-400 font-bold mb-4 uppercase text-xs tracking-wider">Perfil</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
