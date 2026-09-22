@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { TrainingPlan } from './types';
 import { supabase } from './supabase';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface TrainingPlannerProps {
   plans: TrainingPlan[];
@@ -211,6 +213,7 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
 export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }: TrainingPlannerProps) {
   const [view, setView] = useState<'list' | 'form' | 'details'>('list');
   const [current, setCurrent] = useState<any | null>(null); 
+  const [pdfLoading, setPdfLoading] = useState(false);
   
   const [exercises, setExercises] = useState<any[]>([]);
 
@@ -273,6 +276,36 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     setView('details');
   };
 
+  // ----------------------------------------------------
+  // NOVA FUNÇÃO: GERADOR DE PDF DE ALTA QUALIDADE
+  // ----------------------------------------------------
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('pdf-content');
+    if (!element) return;
+    
+    try {
+      setPdfLoading(true);
+      // Tirar "foto" ao elemento HTML em alta resolução
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      
+      // Criar PDF A4 Vertical
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Colar a imagem perfeitamente ajustada na folha
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Treino_${current.date}.pdf`);
+      
+    } catch (error) {
+      alert('Ocorreu um erro ao gerar o PDF. Verifique se instalou as bibliotecas.');
+      console.error(error);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   const addExercise = () => setExercises([...exercises, { id: Date.now().toString(), title: '', duration: '', description: '', board_image: '' }]);
   const updateExercise = (index: number, field: string, value: string) => {
     const newExercises = [...exercises];
@@ -311,7 +344,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-slate-800/60 pb-6">
           <div className="text-left">
             <h2 className="text-2xl font-semibold text-white tracking-tight mb-1">Planear Treino</h2>
-            <p className="text-sm text-slate-400 font-medium">Gira as sessões, desenhe as dinâmicas e defina objetivos.</p>
+            <p className="text-sm text-slate-400 font-medium">Gira as sessões, desenhe as dinâmicas e exporte em PDF.</p>
           </div>
           <button onClick={() => openForm()} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 shadow-lg shadow-blue-900/20 transition-all flex gap-2 items-center w-full md:w-auto justify-center">
             <span>+</span> Nova Sessão
@@ -354,9 +387,15 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
                   <h3 className="text-lg font-semibold text-white mb-4 leading-snug flex-1 relative z-10">{plan.theme}</h3>
 
                   <div className="flex gap-2 mt-auto relative z-10">
-                    <button onClick={() => openDetails(plan)} className="flex-1 py-2 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition-colors border border-slate-700/50">Imprimir</button>
-                    <button onClick={() => openForm(plan)} className="flex-1 py-2 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg text-[11px] font-medium border border-blue-500/20 transition-colors">Editar</button>
-                    <button onClick={() => handleDeleteClick(plan.id, plan.theme)} className="flex-1 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-[11px] font-medium border border-red-500/20 transition-colors">Eliminar</button>
+                    <button onClick={() => openDetails(plan)} className="flex-1 py-2 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition-colors border border-slate-700/50 flex items-center justify-center gap-1">
+                      📄 PDF
+                    </button>
+                    <button onClick={() => openForm(plan)} className="flex-1 py-2 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg text-[11px] font-medium border border-blue-500/20 transition-colors">
+                      Editar
+                    </button>
+                    <button onClick={() => handleDeleteClick(plan.id, plan.theme)} className="flex-1 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-[11px] font-medium border border-red-500/20 transition-colors">
+                      Eliminar
+                    </button>
                   </div>
                 </div>
               );
@@ -367,171 +406,106 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     );
   }
 
-  // VISTA 2: DETALHES E IMPRESSÃO (PAGINAÇÃO NATURAL E FLEXÍVEL)
+  // VISTA 2: VISUALIZAÇÃO A4 E GERAÇÃO DE PDF
   if (view === 'details' && current) {
     const currentExercises = Array.isArray(current.exercises) ? current.exercises : [];
     const validExercises = currentExercises.filter((ex: any) => (ex.title && ex.title.trim() !== '') || (ex.description && ex.description.trim() !== ''));
 
     return (
-      <div className="p-2 md:p-6 max-w-4xl mx-auto">
-        <style>
-          {`
-            @media print {
-              @page { size: A4 portrait; margin: 10mm; }
-
-              /* Esconder interface inútil para impressão */
-              aside, header, nav, .no-print, button { display: none !important; }
-
-              /* QUEBRAR AS PRISÕES DO LAYOUT - Isto permite que o texto passe para a página 2 se for preciso */
-              html, body, #root, .flex, .flex-1, .h-screen, .overflow-hidden, .overflow-y-auto, main {
-                height: auto !important;
-                min-height: 0 !important;
-                overflow: visible !important;
-                position: static !important;
-                display: block !important;
-                background: white !important;
-                color: black !important;
-              }
-
-              /* A Folha: Ocupa os 100% disponíveis */
-              .printable-a4 {
-                width: 100% !important;
-                max-width: 100% !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                background: white !important;
-                border: none !important;
-                box-shadow: none !important;
-                display: block !important;
-              }
-
-              /* Estilos de Impressão Puros */
-              .print-text-black { color: #000 !important; }
-              .print-text-gray { color: #444 !important; }
-              .print-border-black { border-color: #ccc !important; }
-              .print-bg-gray { background-color: #f9fafb !important; }
-
-              /* Cabeçalho de Impressão */
-              .print-header {
-                padding: 0 0 15px 0 !important;
-                margin-bottom: 20px !important;
-                border-bottom: 2px solid #000 !important;
-                background: transparent !important;
-              }
-
-              .print-body { padding: 0 !important; }
-
-              /* GRELHA ADAPTÁVEL: Permite ocupar toda a folha mas evita cortes */
-              .print-exercises-grid {
-                display: grid !important;
-                grid-template-columns: ${validExercises.length > 1 ? '1fr 1fr' : '1fr'} !important;
-                gap: 15px !important;
-                width: 100% !important;
-              }
-
-              /* Cada Exercício não deve ser cortado a meio pela quebra de página */
-              .print-exercise-card {
-                padding: 15px !important;
-                border: 1px solid #e2e8f0 !important;
-                border-radius: 12px !important;
-                display: flex !important;
-                flex-direction: column !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-              }
-
-              /* Wrapper da imagem do quadro tático */
-              .print-canvas-wrapper {
-                margin-top: 10px !important;
-                text-align: center !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-              }
-
-              /* Tamanho protegido do Quadro Tático */
-              .print-canvas-img {
-                max-height: 220px !important;
-                width: 100% !important;
-                object-fit: contain !important;
-              }
-              
-              .avoid-page-break {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-              }
-            }
-          `}
-        </style>
-
-        <div className="flex justify-between items-center mb-6 no-print">
-          <button onClick={() => setView('list')} className="text-slate-400 text-sm font-medium hover:text-white transition-colors">← Voltar</button>
-          <button onClick={() => window.print()} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 shadow-md transition-all flex gap-2 items-center">🖨️ Imprimir Folha A4</button>
+      <div className="p-2 md:p-6 max-w-5xl mx-auto">
+        
+        {/* CABEÇALHO COM BOTÃO DE DOWNLOAD */}
+        <div className="flex justify-between items-center mb-6">
+          <button onClick={() => setView('list')} className="text-slate-400 text-sm font-medium hover:text-white transition-colors">
+            ← Voltar
+          </button>
+          <button 
+            onClick={handleDownloadPDF} 
+            disabled={pdfLoading}
+            className="bg-red-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-red-500 shadow-md transition-all flex gap-2 items-center disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {pdfLoading ? 'A gerar...' : '📄 Descarregar PDF'}
+          </button>
         </div>
         
-        <div className="printable-a4 bg-[#151c2c] rounded-2xl border border-slate-800/60 shadow-xl overflow-hidden min-h-[297mm]">
-          <div className="print-header p-8 border-b border-slate-800/60 print-border-black print-bg-gray">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-white print-text-black uppercase tracking-tight">Ficha de Treino</h1>
-                <p className="text-sm text-slate-400 print-text-gray font-medium mt-1">{activeTeam.club} • {activeTeam.year}</p>
-              </div>
-              <div className="text-right">
-                <span className="block text-[10px] text-slate-500 print-text-gray uppercase tracking-widest font-bold mb-1">Data da Sessão</span>
-                <span className="text-lg font-bold text-blue-400 print-text-black">{new Date(current.date).toLocaleDateString('pt-PT')}</span>
-              </div>
-            </div>
+        {/* WRAPPER PARA O PREVIEW DA FOLHA (Adiciona scroll horizontal em telemóveis) */}
+        <div className="overflow-x-auto pb-8 flex justify-center custom-scrollbar">
+          
+          {/* O ALVO DO GERADOR DE PDF (Tem as dimensões EXATAS de uma folha A4 em pixeis: 794x1123) */}
+          <div 
+            id="pdf-content" 
+            className="bg-white shrink-0 shadow-2xl flex flex-col box-border"
+            style={{ width: '794px', height: '1123px', padding: '40px' }}
+          >
             
-            <div className="bg-[#0f1523] print-bg-gray p-3.5 rounded-xl border border-slate-700/50 print-border-black">
-              <span className="block text-[10px] text-slate-500 print-text-gray uppercase tracking-widest font-bold mb-0.5">Tema Principal</span>
-              <h2 className="text-base font-semibold text-slate-100 print-text-black">{current.theme}</h2>
+            {/* CABEÇALHO DA FICHA */}
+            <div className="flex-shrink-0 border-b-2 border-slate-800 pb-4 mb-5">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight m-0">Ficha de Treino</h1>
+                  <p className="text-sm text-slate-600 font-bold mt-1 m-0">{activeTeam.club} • {activeTeam.year}</p>
+                </div>
+                <div className="text-right">
+                  <span className="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Data da Sessão</span>
+                  <span className="text-xl font-black text-slate-900 m-0">{new Date(current.date).toLocaleDateString('pt-PT')}</span>
+                </div>
+              </div>
+              
+              <div className="bg-slate-100 p-3 rounded-lg border border-slate-300">
+                <span className="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-0.5">Tema Principal</span>
+                <h2 className="text-lg font-bold text-slate-900 m-0">{current.theme}</h2>
+              </div>
             </div>
-          </div>
 
-          <div className="print-body p-6">
-            
-            {validExercises.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-xs font-bold text-slate-200 print-text-black mb-3 uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
-                  Estrutura e Exercícios
-                </h3>
-                
-                <div className="print-exercises-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {validExercises.map((ex: any, idx: number) => (
-                    <div key={idx} className="print-exercise-card bg-[#0f1523]/50 print-bg-gray p-4 rounded-xl border border-slate-800/60 print-border-black">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="text-sm font-bold text-white print-text-black">{idx + 1}. {ex.title || ex.name || 'Exercício'}</h4>
-                        {ex.duration && <span className="text-[10px] font-bold text-slate-400 print-text-gray bg-slate-800/50 print-bg-gray px-2 py-0.5 rounded">⏳ {ex.duration} min</span>}
-                      </div>
-                      
-                      {ex.description && (
-                        <p className="text-xs text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed">{ex.description}</p>
-                      )}
-                      
-                      {(ex as any).board_image && (
-                        <div className="print-canvas-wrapper w-full flex justify-center bg-[#090e17] rounded-lg overflow-hidden border border-slate-700/50 print-border-black mt-3">
-                          <img src={(ex as any).board_image} alt={`Tática ${idx + 1}`} className="print-canvas-img max-h-[220px] w-full object-contain" />
+            {/* CORPO DA FICHA (Estica até ao fim da página) */}
+            <div className="flex-1 flex flex-col min-h-0">
+              
+              {validExercises.length > 0 && (
+                <div className="flex-1 flex flex-col min-h-0">
+                  <h3 className="text-xs font-black text-slate-900 mb-3 uppercase tracking-wider flex items-center gap-2 border-b border-slate-300 pb-1">
+                    <span className="w-2 h-2 rounded-full bg-slate-900"></span>
+                    Estrutura e Exercícios
+                  </h3>
+                  
+                  {/* GRELHA ADAPTÁVEL PARA PREENCHER O ESPAÇO */}
+                  <div className={`grid gap-4 flex-1 min-h-0 ${validExercises.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {validExercises.map((ex: any, idx: number) => (
+                      <div key={idx} className="bg-slate-50 p-4 rounded-xl border border-slate-300 flex flex-col h-full overflow-hidden">
+                        <div className="flex justify-between items-start mb-2 shrink-0">
+                          <h4 className="text-sm font-bold text-slate-900 m-0">{idx + 1}. {ex.title || ex.name || 'Exercício'}</h4>
+                          {ex.duration && <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded border border-slate-300">⏳ {ex.duration} min</span>}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        
+                        {ex.description && (
+                          <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed mb-2 shrink-0">{ex.description}</p>
+                        )}
+                        
+                        {/* A imagem consome o espaço restante */}
+                        {(ex as any).board_image && (
+                          <div className="mt-auto flex-1 w-full flex justify-center items-center min-h-0">
+                            <img src={(ex as any).board_image} alt={`Tática ${idx + 1}`} className="max-w-full max-h-full object-contain rounded border border-slate-300" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {current.finalAppreciation && (
-              <div className="avoid-page-break mt-6">
-                <h3 className="text-xs font-bold text-slate-200 print-text-black mb-2 uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
-                  Observações Finais
-                </h3>
-                <div className="bg-[#0f1523]/50 print-bg-gray p-4 rounded-xl border border-slate-800/60 print-border-black">
-                  <p className="text-xs text-slate-300 print-text-black whitespace-pre-wrap leading-relaxed">{current.finalAppreciation}</p>
+              {/* OBSERVAÇÕES FINAIS (Fica colado ao fundo) */}
+              {current.finalAppreciation && (
+                <div className="flex-shrink-0 mt-5">
+                  <h3 className="text-xs font-black text-slate-900 mb-2 uppercase tracking-wider flex items-center gap-2 border-b border-slate-300 pb-1">
+                    <span className="w-2 h-2 rounded-full bg-slate-900"></span>
+                    Observações Finais
+                  </h3>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-300">
+                    <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed m-0">{current.finalAppreciation}</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
+            </div>
           </div>
         </div>
       </div>
@@ -561,7 +535,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
 
           <div className="border-t border-slate-800/60 pt-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Construtor de Exercícios (Opcional)</label>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Construtor de Exercícios</label>
               <button type="button" onClick={addExercise} className="bg-blue-600 text-white hover:bg-blue-500 px-4 py-2 rounded-lg text-xs font-bold transition-colors w-full sm:w-auto shadow-md">
                 + Adicionar Exercício
               </button>
