@@ -119,4 +119,12 @@ export interface FutureOpponentScouting {
   strongPlayers?: string;
   weakPlayers?: string;
   observations?: string;
+  // NOVOS CAMPOS DO RELATÓRIO PROFISSIONAL
+  attackingFormation?: string;
+  defendingFormation?: string;
+  formationBoardImage?: string;
+  offensiveCorners?: string;
+  defensiveCorners?: string;
+  offensiveCornersPhotoUrl?: string;
+  defensiveCornersPhotoUrl?: string;
 }

@@ -17,12 +17,24 @@ import { StaffMember, Player, MatchReport, FutureOpponentScouting, Team, Trainin
 type TabType = 'dashboard' | 'training_plan' | 'training' | 'match' | 'future_scouting' | 'admin' | 'players' | 'tactics' | 'stats' | 'account';
 const TIMEOUT_MS = 15 * 60 * 1000; 
 
-const mapStaff = (row: any): StaffMember => ({ id: row.id, username: row.username, password: row.password, name: row.name, age: row.age, address: row.address, phone: row.phone, role: row.role });
+const mapStaff = (row: any): StaffMember => ({ id: row.id, username: row.username, password: row.password, name: row.name, age: row.age, address: row.address, phone: row.phone, role: row.role, must_change_password: row.must_change_password });
 const mapTeam = (row: any): Team => ({ id: row.id, year: row.year, club: row.club, name: row.name });
 const mapPlayer = (row: any): Player => ({ id: row.id, teamId: row.team_id, name: row.name, age: row.age, position: row.position, preferredFoot: row.preferred_foot, birthDate: row.birth_date, notes: row.notes, photoUrl: row.photo_url });
 const mapMatch = (row: any): MatchReport => ({ id: row.id, teamId: row.team_id, date: row.date, opponent: row.opponent, oppTacticalSystem: row.opp_tactical_system, oppBehaviorWinning: row.opp_behavior_winning, oppBehaviorLosing: row.opp_behavior_losing, oppSubstitutions: row.opp_substitutions, oppSetPieces: row.opp_set_pieces, oppFinalEval: row.opp_final_eval, ownInitialSystem: row.own_initial_system, ownFinalSystem: row.own_final_system, ownTeamPositives: row.own_team_positives, ownTeamNegatives: row.own_team_negatives, goalsScored: row.goals_scored, goalsConceded: row.goals_conceded, individualEvals: row.individual_evals });
-const mapPlan = (row: any): TrainingPlan => ({ id: row.id, teamId: row.team_id, date: row.date, theme: row.theme, exercises: row.exercises, finalAppreciation: row.final_appreciation });
-const mapScouting = (row: any): FutureOpponentScouting => ({ id: row.id, teamId: row.team_id, opponentName: row.opponent_name, observationDate: row.observation_date, tacticalModel: row.tactical_model, behaviorWinning: row.behavior_winning, behaviorLosing: row.behavior_losing, substitutionsImpact: row.substitutions_impact, setPieces: row.set_pieces, setPiecesPhotoUrl: row.set_pieces_photo_url, strengths: row.strengths, weaknesses: row.weaknesses, strongPlayers: row.strong_players, weakPlayers: row.weak_players, observations: row.observations });
+const mapPlan = (row: any): TrainingPlan => ({ id: row.id, teamId: row.team_id, date: row.date, theme: row.theme, exercises: row.exercises, finalAppreciation: row.final_appreciation, board_image: row.board_image });
+
+// MAPEAMENTO DO NOVO RELATÓRIO DE SCOUTING
+const mapScouting = (row: any): FutureOpponentScouting => ({ 
+  id: row.id, teamId: row.team_id, opponentName: row.opponent_name, observationDate: row.observation_date, 
+  tacticalModel: row.tactical_model, behaviorWinning: row.behavior_winning, behaviorLosing: row.behavior_losing, 
+  substitutionsImpact: row.substitutions_impact, setPieces: row.set_pieces, setPiecesPhotoUrl: row.set_pieces_photo_url, 
+  strengths: row.strengths, weaknesses: row.weaknesses, strongPlayers: row.strong_players, weakPlayers: row.weak_players, 
+  observations: row.observations,
+  attackingFormation: row.attacking_formation, defendingFormation: row.defending_formation,
+  formationBoardImage: row.formation_board_image, offensiveCorners: row.offensive_corners,
+  defensiveCorners: row.defensive_corners, offensiveCornersPhotoUrl: row.offensive_corners_photo_url,
+  defensiveCornersPhotoUrl: row.defensive_corners_photo_url
+});
 
 export default function App() {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
@@ -71,7 +83,6 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('scoutpro_active_tab', activeTab);
-    
     setTabHistory(prev => {
       if (prev[prev.length - 1] === activeTab) return prev;
       const newHistory = [...prev, activeTab];
@@ -185,21 +196,18 @@ export default function App() {
               <span className="text-white font-bold text-xl">SP<span className="text-blue-500">.</span></span>
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Bem-vindo(a), {pendingPasswordChangeUser.name.split(' ')[0]}</h2>
-            <p className="text-slate-400 text-sm">Por questões de segurança, tem de definir uma nova palavra-passe para o seu primeiro acesso.</p>
+            <p className="text-slate-400 text-sm">Defina uma nova palavra-passe para o seu primeiro acesso.</p>
           </div>
-          
           <form onSubmit={handleForcePasswordSubmit} className="space-y-5">
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Nova Palavra-Passe</label>
-              <input required type="password" name="p1" className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="Mínimo 6 caracteres" />
+              <input required type="password" name="p1" className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Mínimo 6 caracteres" />
             </div>
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Confirmar Palavra-Passe</label>
-              <input required type="password" name="p2" className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="Repita a palavra-passe" />
+              <input required type="password" name="p2" className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Repita a palavra-passe" />
             </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-lg shadow-md transition-colors text-sm mt-4">
-              Guardar e Entrar
-            </button>
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-lg shadow-md transition-colors text-sm mt-4">Guardar e Entrar</button>
           </form>
           <button onClick={() => setPendingPasswordChangeUser(null)} className="w-full text-center text-slate-500 text-xs hover:text-slate-300 mt-6 transition-colors">Voltar ao Login</button>
         </div>
@@ -216,13 +224,13 @@ export default function App() {
   };
 
   const handleAddTrainingPlan = async (p: TrainingPlan) => {
-    const payload = { team_id: activeTeam!.id, date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation };
+    const payload = { team_id: activeTeam!.id, date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation, board_image: p.board_image };
     const { data } = await supabase.from('training_plans').insert([payload]).select().single();
     if (data) setTrainingPlans([mapPlan(data), ...trainingPlans]);
   };
 
   const handleUpdateTrainingPlan = async (p: TrainingPlan) => {
-    const payload = { date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation };
+    const payload = { date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation, board_image: p.board_image };
     const { data } = await supabase.from('training_plans').update(payload).eq('id', p.id).select().single();
     if (data) {
       const updated = mapPlan(data);
@@ -239,16 +247,6 @@ export default function App() {
     };
     const { data } = await supabase.from('match_reports').insert([payload]).select().single();
     if (data) setMatchReports([mapMatch(data), ...matchReports]);
-  };
-
-  const handleAddFutureReport = async (r: FutureOpponentScouting) => {
-    const payload = {
-      team_id: activeTeam!.id, opponent_name: r.opponentName, observation_date: r.observationDate, tactical_model: r.tacticalModel, behavior_winning: r.behaviorWinning,
-      behavior_losing: r.behaviorLosing, substitutions_impact: r.substitutionsImpact, set_pieces: r.setPieces, set_pieces_photo_url: r.setPiecesPhotoUrl,
-      strengths: r.strengths, weaknesses: r.weaknesses, strong_players: r.strongPlayers, weak_players: r.weakPlayers, observations: r.observations
-    };
-    const { data } = await supabase.from('future_scouting').insert([payload]).select().single();
-    if (data) setFutureReports([mapScouting(data), ...futureReports]);
   };
 
   if (!activeTeam) {
@@ -271,10 +269,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-[#090e17] text-slate-200 font-sans overflow-hidden">
-      
-      {/* BARRA LATERAL COM A CORREÇÃO DE OVERFLOW (Agora esconde o texto ao fechar) */}
       <aside className={`hidden md:flex bg-[#0f1523] flex-col z-20 shadow-xl transition-all duration-300 ease-in-out overflow-hidden ${isSidebarOpen ? 'w-64 border-r border-slate-800/60 opacity-100' : 'w-0 border-none opacity-0'}`}>
-        {/* A largura fixa de w-64 aqui garante que o layout interno nunca é esmagado */}
         <div className="w-64 flex flex-col h-screen">
           <div className="p-6 border-b border-slate-800/60 shrink-0">
             <div className="flex items-center justify-between mb-5">
@@ -295,11 +290,7 @@ export default function App() {
           </nav>
 
           <div className="p-5 border-t border-slate-800/60 bg-[#0f1523] shrink-0">
-            <div 
-              onClick={() => setActiveTab('account')}
-              className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600/50 transition-all"
-              title="Ir para as Definições da Conta"
-            >
+            <div onClick={() => setActiveTab('account')} className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600/50 transition-all" title="Ir para as Definições da Conta">
               <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-sm">{currentUser.name.charAt(0)}</div>
               <div className="flex-1 overflow-hidden">
                 <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
@@ -312,12 +303,9 @@ export default function App() {
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
         <header className="bg-[#0f1523]/80 backdrop-blur-md border-b border-slate-800/60 px-4 md:px-8 py-3.5 flex justify-between items-center z-10 sticky top-0">
-          
           <div className="flex items-center gap-3 md:hidden">
              {activeTab !== 'dashboard' && (
-               <button onClick={handleGoBack} className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 border border-slate-700/50 active:bg-slate-700 transition-colors">
-                 <span className="font-medium text-base leading-none mb-0.5">←</span>
-               </button>
+               <button onClick={handleGoBack} className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 border border-slate-700/50 active:bg-slate-700 transition-colors"><span className="font-medium text-base leading-none mb-0.5">←</span></button>
              )}
              <div className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center border border-slate-700/50"><span className="text-white font-bold text-[10px]">SP<span className="text-blue-500">.</span></span></div>
              <div className="flex flex-col"><h1 className="text-xs font-semibold text-white leading-none truncate max-w-[120px]">{activeTeam.club}</h1><span className="text-[8px] text-slate-400 uppercase tracking-widest mt-0.5">{activeTeam.year}</span></div>
@@ -327,11 +315,8 @@ export default function App() {
              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700" title="Alternar Menu">
                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
              </button>
-             
              {activeTab !== 'dashboard' && (
-               <button onClick={handleGoBack} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700" title="Voltar atrás">
-                 <span className="font-medium text-lg leading-none mb-0.5">←</span>
-               </button>
+               <button onClick={handleGoBack} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700" title="Voltar atrás"><span className="font-medium text-lg leading-none mb-0.5">←</span></button>
              )}
             <h2 className="text-lg font-semibold text-white tracking-wide">{menuItems.find(m => m.id === activeTab)?.label}</h2>
           </div>
@@ -350,7 +335,7 @@ export default function App() {
             {activeTab === 'training_plan' && <TrainingPlannerModule plans={trainingPlans} onAddPlan={handleAddTrainingPlan} onUpdatePlan={handleUpdateTrainingPlan} />}
             {activeTab === 'training' && <TrainingModule players={playersList} />}
             {activeTab === 'match' && <MatchModule players={playersList} reports={matchReports} onAddReport={handleAddMatchReport} />}
-            {activeTab === 'future_scouting' && <FutureScoutingModule reports={futureReports} onAddReport={handleAddFutureReport} />}
+            {activeTab === 'future_scouting' && <FutureScoutingModule reports={futureReports} />}
             {activeTab === 'tactics' && <TacticalBoard players={playersList} />}
             {activeTab === 'stats' && <StatsModule players={playersList} reports={matchReports} />}
             {activeTab === 'account' && <MyAccount />}
