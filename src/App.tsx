@@ -9,11 +9,13 @@ import PlayersModule from './PlayersModule';
 import TacticalBoard from './TacticalBoard';
 import StatsModule from './StatsModule';
 import FutureScoutingModule from './FutureScoutingModule';
+import MyAccount from './MyAccount'; // <-- NOVO MÓDULO IMPORTADO
 import Login from './Login';
 import TeamSelection from './TeamSelection';
 import { StaffMember, Player, MatchReport, FutureOpponentScouting, Team, TrainingPlan } from './types';
 
-type TabType = 'dashboard' | 'training_plan' | 'training' | 'match' | 'future_scouting' | 'admin' | 'players' | 'tactics' | 'stats';
+// Adicionado 'account' aos tipos permitidos
+type TabType = 'dashboard' | 'training_plan' | 'training' | 'match' | 'future_scouting' | 'admin' | 'players' | 'tactics' | 'stats' | 'account';
 const TIMEOUT_MS = 15 * 60 * 1000; 
 
 const mapStaff = (row: any): StaffMember => ({ id: row.id, username: row.username, password: row.password, name: row.name, age: row.age, address: row.address, phone: row.phone, role: row.role });
@@ -197,6 +199,8 @@ export default function App() {
     { id: 'future_scouting', label: 'Adversários', icon: '🔭' },
     { id: 'tactics', label: 'Tática', icon: '📋' },
     { id: 'stats', label: 'Estatísticas', icon: '📈' },
+    // A "Minha Conta" agora faz parte do menu principal (útil também no telemóvel)
+    { id: 'account', label: 'Minha Conta', icon: '👤' },
   ];
 
   if (isAdmin) menuItems.splice(1, 0, { id: 'admin', label: 'Staff', icon: '👥' });
@@ -204,7 +208,6 @@ export default function App() {
   return (
     <div className="flex h-screen bg-[#090e17] text-slate-200 font-sans overflow-hidden">
       
-      {/* SIDEBAR ELEGANTE */}
       <aside className="hidden md:flex w-64 bg-[#0f1523] border-r border-slate-800/60 flex-col z-20 shadow-xl">
         <div className="p-6 border-b border-slate-800/60">
           <div className="flex items-center justify-between mb-5">
@@ -225,7 +228,12 @@ export default function App() {
         </nav>
 
         <div className="p-5 border-t border-slate-800/60 bg-[#0f1523]">
-          <div className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30">
+          {/* Agora o cartão de perfil em baixo também é clicável e redireciona para a Conta! */}
+          <div 
+            onClick={() => setActiveTab('account')}
+            className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600/50 transition-all"
+            title="Ir para as Definições da Conta"
+          >
             <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-sm">{currentUser.name.charAt(0)}</div>
             <div className="flex-1 overflow-hidden">
               <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
@@ -236,10 +244,8 @@ export default function App() {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* CABEÇALHO LIMPO */}
         <header className="bg-[#0f1523]/80 backdrop-blur-md border-b border-slate-800/60 px-4 md:px-8 py-3.5 flex justify-between items-center z-10 sticky top-0">
           
-          {/* LADO ESQUERDO MOBILE */}
           <div className="flex items-center gap-3 md:hidden">
              {activeTab !== 'dashboard' && (
                <button onClick={handleGoBack} className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 border border-slate-700/50 active:bg-slate-700 transition-colors">
@@ -250,7 +256,6 @@ export default function App() {
              <div className="flex flex-col"><h1 className="text-xs font-semibold text-white leading-none truncate max-w-[120px]">{activeTeam.club}</h1><span className="text-[8px] text-slate-400 uppercase tracking-widest mt-0.5">{activeTeam.year}</span></div>
           </div>
           
-          {/* LADO ESQUERDO DESKTOP */}
           <div className="hidden md:flex items-center gap-4">
              {activeTab !== 'dashboard' && (
                <button onClick={handleGoBack} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700" title="Voltar atrás">
@@ -266,7 +271,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* ÁREA PRINCIPAL */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 text-slate-200 pb-24 md:pb-12 custom-scrollbar">
           <div className="max-w-7xl mx-auto" key={activeTeam.id}>
             {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
@@ -278,10 +282,12 @@ export default function App() {
             {activeTab === 'future_scouting' && <FutureScoutingModule reports={futureReports} onAddReport={handleAddFutureReport} />}
             {activeTab === 'tactics' && <TacticalBoard players={playersList} />}
             {activeTab === 'stats' && <StatsModule players={playersList} reports={matchReports} />}
+            
+            {/* O NOVO MÓDULO */}
+            {activeTab === 'account' && <MyAccount />}
           </div>
         </main>
 
-        {/* NAVBAR MOBILE REDESENHADA */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0f1523]/95 backdrop-blur-lg border-t border-slate-800/60 z-50 px-2 py-2 flex justify-between items-center overflow-x-auto custom-scrollbar shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
            {menuItems.map(item => (
              <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`flex flex-col items-center justify-center min-w-[60px] p-2 rounded-xl transition-all duration-200 ${activeTab === item.id ? 'text-blue-400 bg-blue-600/10' : 'text-slate-500'}`}>
