@@ -18,6 +18,15 @@ export default function AdminModule() {
   const [current, setCurrent] = useState<StaffMemberExtended | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // ESTADO DO MODAL PERSONALIZADO
+  const [modal, setModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    onConfirm: (() => void) | null;
+    type: 'alert' | 'confirm';
+  }>({ show: false, title: '', message: '', onConfirm: null, type: 'alert' });
+
   // Vai buscar o staff ativo (para saber quem não se pode auto-eliminar)
   const currentUser = JSON.parse(localStorage.getItem('scoutpro_user') || '{}');
 
@@ -42,6 +51,19 @@ export default function AdminModule() {
   useEffect(() => {
     fetchStaff();
   }, []);
+
+  // Controladores do Modal
+  const openAlert = (title: string, message: string) => {
+    setModal({ show: true, title, message, onConfirm: null, type: 'alert' });
+  };
+
+  const openConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setModal({ show: true, title, message, onConfirm, type: 'confirm' });
+  };
+
+  const closeModal = () => {
+    setModal(prev => ({ ...prev, show: false }));
+  };
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -68,25 +90,29 @@ export default function AdminModule() {
       
       window.location.reload();
     } catch (err: any) {
-      alert(`Erro ao guardar: ${err.message}`);
+      openAlert("Erro", `Erro ao guardar: ${err.message}`);
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
+  const handleDeleteClick = (id: string, name: string) => {
     if (id === currentUser.id) {
-      alert("Não se pode eliminar a si próprio!");
+      openAlert("Ação não permitida", "Não pode eliminar a sua própria conta de administrador!");
       return;
     }
     
-    if (!window.confirm(`Tem a certeza que deseja eliminar o acesso de ${name}? Esta ação não pode ser revertida.`)) return;
-    
-    try {
-      const { error } = await supabase.from('staff').delete().eq('id', id);
-      if (error) throw error;
-      window.location.reload();
-    } catch (err: any) {
-      alert(`Erro ao eliminar: ${err.message}`);
-    }
+    openConfirm(
+      "Eliminar Acesso",
+      `Tem a certeza que deseja eliminar o acesso de ${name}? Esta ação não pode ser revertida.`,
+      async () => {
+        try {
+          const { error } = await supabase.from('staff').delete().eq('id', id);
+          if (error) throw error;
+          window.location.reload();
+        } catch (err: any) {
+          openAlert("Erro", `Erro ao eliminar: ${err.message}`);
+        }
+      }
+    );
   };
 
   const openForm = (staff: StaffMemberExtended | null = null) => {
@@ -94,9 +120,45 @@ export default function AdminModule() {
     setView('form');
   };
 
+  // COMPONENTE DO MODAL
+  const renderModal = () => {
+    if (!modal.show) return null;
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 md:p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+          <h3 className="text-xl font-black text-white mb-2">{modal.title}</h3>
+          <p className="text-slate-300 mb-8">{modal.message}</p>
+
+          <div className="flex gap-3 justify-end">
+            {modal.type === 'confirm' && (
+              <button onClick={closeModal} className="px-5 py-2.5 rounded-xl font-bold text-slate-300 bg-slate-700 hover:bg-slate-600 transition-colors">
+                Cancelar
+              </button>
+            )}
+            <button 
+              onClick={() => {
+                if (modal.onConfirm) modal.onConfirm();
+                else closeModal();
+              }}
+              className={`px-5 py-2.5 rounded-xl font-bold text-white transition-colors ${
+                modal.type === 'confirm' ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'
+              }`}
+            >
+              {modal.type === 'confirm' ? 'Eliminar' : 'OK'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (view === 'list') {
     return (
-      <div className="p-2 md:p-6 max-w-7xl mx-auto">
+      <div className="p-2 md:p-6 max-w-7xl mx-auto relative">
+        
+        {/* Renderiza o Popup Customizado */}
+        {renderModal()}
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h2 className="text-2xl md:text-3xl font-black text-white">Equipa Técnica</h2>
@@ -120,25 +182,26 @@ export default function AdminModule() {
               <div key={member.id} className={`bg-slate-800 p-6 rounded-2xl border ${member.id === currentUser.id ? 'border-blue-500/50 shadow-blue-900/20' : 'border-slate-700'} shadow-lg hover:border-slate-500 transition-colors relative flex flex-col h-full`}>
                 
                 {member.id === currentUser.id && (
-                  <div className="absolute top-4 right-4 bg-blue-600 text-white text-[10px] font-black uppercase px-2 py-1 rounded-md">Você</div>
+                  <div className="absolute top-4 right-4 bg-blue-600 text-white text-[10px] font-black uppercase px-2 py-1 rounded-md z-10">Você</div>
                 )}
                 
+                {/* CORREÇÃO DO LAYOUT (min-w-0, shrink-0, truncate) */}
                 <div className="flex items-center gap-4 mb-5">
-                  <div className="w-14 h-14 rounded-full bg-slate-700 flex items-center justify-center text-xl font-black text-white shadow-inner">
+                  <div className="w-14 h-14 shrink-0 rounded-full bg-slate-700 flex items-center justify-center text-xl font-black text-white shadow-inner">
                     {member.name.substring(0, 2).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="text-lg font-black text-white leading-tight">{member.name}</h3>
-                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">{member.role}</span>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-black text-white leading-tight truncate" title={member.name}>{member.name}</h3>
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wide block truncate" title={member.role}>{member.role}</span>
                   </div>
                 </div>
                 
                 <div className="space-y-2 mb-6 flex-1">
                   <p className="text-sm text-slate-400 flex items-center gap-2">
-                    <span>📧</span> <span className="font-semibold text-slate-300">{member.username}</span>
+                    <span className="shrink-0">📧</span> <span className="font-semibold text-slate-300 truncate">{member.username}</span>
                   </p>
                   <p className="text-sm text-slate-400 flex items-center gap-2">
-                    <span>📱</span> {member.phone || 'Sem contacto'}
+                    <span className="shrink-0">📱</span> <span className="truncate">{member.phone || 'Sem contacto'}</span>
                   </p>
                 </div>
 
@@ -147,7 +210,7 @@ export default function AdminModule() {
                     Editar
                   </button>
                   <button 
-                    onClick={() => handleDelete(member.id, member.name)} 
+                    onClick={() => handleDeleteClick(member.id, member.name)} 
                     disabled={member.id === currentUser.id}
                     className={`py-2 rounded-lg text-sm font-bold border transition-all ${member.id === currentUser.id ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed' : 'bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border-red-500/20'}`}
                   >
