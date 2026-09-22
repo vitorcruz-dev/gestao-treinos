@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { TrainingPlan } from './types';
-import { supabase } from './supabase'; // Adicionado para permitir a eliminação
+import { supabase } from './supabase';
 
 interface TrainingPlannerProps {
   plans: TrainingPlan[];
@@ -8,13 +8,219 @@ interface TrainingPlannerProps {
   onUpdatePlan: (plan: TrainingPlan) => void;
 }
 
+// ==========================================
+// COMPONENTE: QUADRO TÁTICO INTERATIVO
+// ==========================================
+const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onChange: (img: string) => void }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [tool, setTool] = useState('draw');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
+  const [history, setHistory] = useState<string[]>([]);
+
+  const initPitch = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // Fundo do Campo (Verde/Escuro)
+    ctx.fillStyle = '#0f1523';
+    ctx.fillRect(0, 0, w, h);
+
+    // Linhas do Campo
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(30, 30, w - 60, h - 60); // Linha Lateral
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 30);
+    ctx.lineTo(w / 2, h - 30); // Meio Campo
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, 50, 0, Math.PI * 2); // Círculo Central
+    ctx.stroke();
+    
+    // Pequenas áreas
+    ctx.strokeRect(30, h / 2 - 80, 100, 160);
+    ctx.strokeRect(w - 130, h / 2 - 80, 100, 160);
+  };
+
+  const loadSnapshot = (dataUrl: string) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+    };
+    img.src = dataUrl;
+  };
+
+  useEffect(() => {
+    if (defaultImage && defaultImage.startsWith('data:image')) {
+      loadSnapshot(defaultImage);
+      setHistory([defaultImage]);
+    } else {
+      initPitch();
+      saveSnapshot();
+    }
+    // eslint-disable-next-line
+  }, []);
+
+  const saveSnapshot = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dataUrl = canvas.toDataURL('image/png');
+    setHistory(prev => [...prev, dataUrl]);
+    onChange(dataUrl);
+  };
+
+  const handleUndo = () => {
+    if (history.length > 1) {
+      const newHistory = [...history];
+      newHistory.pop(); // remove o atual
+      const previous = newHistory[newHistory.length - 1];
+      setHistory(newHistory);
+      loadSnapshot(previous);
+      onChange(previous);
+    } else if (history.length === 1) {
+      initPitch();
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const dataUrl = canvas.toDataURL('image/png');
+        setHistory([dataUrl]);
+        onChange(dataUrl);
+      }
+    }
+  };
+
+  const handleClear = () => {
+    initPitch();
+    saveSnapshot();
+  };
+
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    };
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const pos = getPos(e);
+    if (tool === 'draw') {
+      setIsDrawing(true);
+      setLastPos(pos);
+    } else {
+      // Estampar Ícone
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (!ctx) return;
+      ctx.font = '36px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      const icons: any = {
+        'cone': '🔺', 'goal': '🥅', 't1': '🔴', 't2': '🔵', 
+        't3': '🟡', 't4': '⚫', 'barrier': '🚧', 'ladder': '🪜'
+      };
+      
+      ctx.fillText(icons[tool] || '', pos.x, pos.y);
+      saveSnapshot();
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || tool !== 'draw') return;
+    const pos = getPos(e);
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(lastPos.x, lastPos.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    setLastPos(pos);
+  };
+
+  const handlePointerUp = () => {
+    if (isDrawing) {
+      setIsDrawing(false);
+      saveSnapshot();
+    }
+  };
+
+  const toolsList = [
+    { id: 'draw', label: '✏️ Linha' },
+    { id: 'cone', label: '🔺 Cone' },
+    { id: 'goal', label: '🥅 Baliza' },
+    { id: 'barrier', label: '🚧 Barreira' },
+    { id: 'ladder', label: '🪜 Escada' },
+    { id: 't1', label: '🔴 Eq. 1' },
+    { id: 't2', label: '🔵 Eq. 2' },
+    { id: 't3', label: '🟡 Eq. 3' },
+    { id: 't4', label: '⚫ Eq. 4' },
+  ];
+
+  return (
+    <div className="w-full flex flex-col gap-3">
+      {/* Barra de Ferramentas */}
+      <div className="flex flex-wrap gap-2 bg-[#090e17] p-3 rounded-xl border border-slate-700/80">
+        {toolsList.map(t => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTool(t.id)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${tool === t.id ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+        <div className="flex-1"></div>
+        <button type="button" onClick={handleUndo} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">↩️ Desfazer</button>
+        <button type="button" onClick={handleClear} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white">🗑️ Limpar</button>
+      </div>
+
+      {/* Canvas */}
+      <div className="w-full bg-[#090e17] rounded-xl border-2 border-slate-700/80 overflow-hidden relative" style={{ touchAction: 'none' }}>
+        <canvas
+          ref={canvasRef}
+          width={800}
+          height={500}
+          className="w-full h-auto cursor-crosshair"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          style={{ touchAction: 'none' }} // Evita scroll do telemóvel ao desenhar
+        />
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// MÓDULO PRINCIPAL
+// ==========================================
 export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }: TrainingPlannerProps) {
   const [view, setView] = useState<'list' | 'form' | 'details'>('list');
-  const [current, setCurrent] = useState<TrainingPlan | null>(null);
+  const [current, setCurrent] = useState<any | null>(null); // any para aceitar board_image
   
   const [exercises, setExercises] = useState<any[]>([]);
+  const [boardImage, setBoardImage] = useState<string>(''); // Guarda o estado do desenho
 
-  // ESTADO DO MODAL PARA ELIMINAR TREINOS COM SEGURANÇA
   const [modal, setModal] = useState<{
     show: boolean;
     title: string;
@@ -39,22 +245,19 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
       date: fd.get('date') as string,
       theme: fd.get('theme') as string,
       finalAppreciation: fd.get('finalAppreciation') as string,
-      exercises: exercises
+      exercises: exercises,
+      board_image: boardImage // Salva o quadro tático!
     };
 
-    if (current) {
-      onUpdatePlan(planData);
-    } else {
-      onAddPlan(planData);
-    }
+    if (current) onUpdatePlan(planData);
+    else onAddPlan(planData);
     setView('list');
   };
 
-  // FUNÇÃO PARA ELIMINAR TREINO
   const handleDeleteClick = (id: string, theme: string) => {
     openConfirm(
       "Eliminar Sessão de Treino",
-      `Tem a certeza que deseja eliminar o treino "${theme}"? O planeamento e todos os exercícios associados serão apagados.`,
+      `Tem a certeza que deseja eliminar o treino "${theme}"? O planeamento e exercícios associados serão apagados.`,
       async () => {
         try {
           const { error } = await supabase.from('training_plans').delete().eq('id', id);
@@ -67,30 +270,25 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     );
   };
 
-  const openForm = (plan: TrainingPlan | null = null) => {
+  const openForm = (plan: any | null = null) => {
     setCurrent(plan);
     setExercises(Array.isArray(plan?.exercises) ? plan.exercises : []);
+    setBoardImage(plan?.board_image || '');
     setView('form');
   };
 
-  const openDetails = (plan: TrainingPlan) => {
+  const openDetails = (plan: any) => {
     setCurrent(plan);
     setView('details');
   };
 
-  const addExercise = () => {
-    setExercises([...exercises, { id: Date.now().toString(), title: '', duration: '', description: '' }]);
-  };
-
+  const addExercise = () => setExercises([...exercises, { id: Date.now().toString(), title: '', duration: '', description: '' }]);
   const updateExercise = (index: number, field: string, value: string) => {
     const newExercises = [...exercises];
     newExercises[index] = { ...newExercises[index], [field]: value };
     setExercises(newExercises);
   };
-
-  const removeExercise = (index: number) => {
-    setExercises(exercises.filter((_, i) => i !== index));
-  };
+  const removeExercise = (index: number) => setExercises(exercises.filter((_, i) => i !== index));
 
   const renderModal = () => {
     if (!modal.show) return null;
@@ -119,11 +317,10 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     return (
       <div className="p-2 md:p-6 max-w-5xl mx-auto relative">
         {renderModal()}
-
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-slate-800/60 pb-6">
           <div className="text-left">
             <h2 className="text-2xl font-semibold text-white tracking-tight mb-1">Planear Treino</h2>
-            <p className="text-sm text-slate-400 font-medium">Gira as sessões de treino, exercícios e objetivos.</p>
+            <p className="text-sm text-slate-400 font-medium">Gira as sessões, desenhe as dinâmicas e defina objetivos.</p>
           </div>
           <button onClick={() => openForm()} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 shadow-lg shadow-blue-900/20 transition-all flex gap-2 items-center w-full md:w-auto justify-center">
             <span>+</span> Nova Sessão
@@ -139,33 +336,35 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {plans.map(plan => {
-              // Contar apenas os exercícios que tenham algum conteúdo preenchido
               const planExercises = Array.isArray(plan.exercises) ? plan.exercises : [];
               const validCount = planExercises.filter(ex => ex.title?.trim() || ex.description?.trim()).length;
+              const hasDrawing = !!(plan as any).board_image;
 
               return (
-                <div key={plan.id} className="bg-[#151c2c] p-5 rounded-xl border border-slate-800/60 hover:border-slate-700 transition-colors shadow-sm flex flex-col h-full">
-                  <div className="flex justify-between items-start mb-4">
+                <div key={plan.id} className="bg-[#151c2c] p-5 rounded-xl border border-slate-800/60 hover:border-slate-700 transition-colors shadow-sm flex flex-col h-full relative overflow-hidden">
+                  
+                  {hasDrawing && (
+                    <div className="absolute top-0 right-0 w-16 h-16 opacity-10 pointer-events-none">
+                      <img src={(plan as any).board_image} alt="Tática" className="w-full h-full object-cover rounded-bl-full" />
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-start mb-4 relative z-10">
                     <div className="bg-slate-800/80 px-3 py-1 rounded-md text-xs font-bold text-blue-400 uppercase tracking-widest border border-slate-700">
                       {new Date(plan.date).toLocaleDateString('pt-PT')}
                     </div>
-                    <div className="text-[10px] font-bold text-slate-500 bg-slate-800/30 px-2 py-1 rounded">
-                      {validCount} Exercícios
+                    <div className="flex gap-1">
+                      {hasDrawing && <span className="text-[10px] font-bold text-slate-300 bg-blue-500/20 px-2 py-1 rounded">📋 Quadro</span>}
+                      <span className="text-[10px] font-bold text-slate-500 bg-slate-800/30 px-2 py-1 rounded">{validCount} Exer.</span>
                     </div>
                   </div>
                   
-                  <h3 className="text-lg font-semibold text-white mb-4 leading-snug flex-1">{plan.theme}</h3>
+                  <h3 className="text-lg font-semibold text-white mb-4 leading-snug flex-1 relative z-10">{plan.theme}</h3>
 
-                  <div className="flex gap-2 mt-auto">
-                    <button onClick={() => openDetails(plan)} className="flex-1 py-2 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition-colors border border-slate-700/50">
-                      Imprimir
-                    </button>
-                    <button onClick={() => openForm(plan)} className="flex-1 py-2 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg text-[11px] font-medium border border-blue-500/20 transition-colors">
-                      Editar
-                    </button>
-                    <button onClick={() => handleDeleteClick(plan.id, plan.theme)} className="flex-1 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-[11px] font-medium border border-red-500/20 transition-colors">
-                      Eliminar
-                    </button>
+                  <div className="flex gap-2 mt-auto relative z-10">
+                    <button onClick={() => openDetails(plan)} className="flex-1 py-2 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition-colors border border-slate-700/50">Imprimir</button>
+                    <button onClick={() => openForm(plan)} className="flex-1 py-2 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg text-[11px] font-medium border border-blue-500/20 transition-colors">Editar</button>
+                    <button onClick={() => handleDeleteClick(plan.id, plan.theme)} className="flex-1 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-[11px] font-medium border border-red-500/20 transition-colors">Eliminar</button>
                   </div>
                 </div>
               );
@@ -176,10 +375,9 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     );
   }
 
-  // VISTA 2: DETALHES E IMPRESSÃO (Folha A4 Perfeita)
+  // VISTA 2: DETALHES E IMPRESSÃO
   if (view === 'details' && current) {
     const currentExercises = Array.isArray(current.exercises) ? current.exercises : [];
-    // FILTRO INTELIGENTE: Remove da impressão qualquer exercício que esteja completamente vazio
     const validExercises = currentExercises.filter(ex => (ex.title && ex.title.trim() !== '') || (ex.description && ex.description.trim() !== ''));
 
     return (
@@ -187,7 +385,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
         <style>
           {`
             @media print {
-              @page { size: A4 portrait; margin: 15mm; }
+              @page { size: A4 portrait; margin: 10mm; }
               body * { visibility: hidden; }
               .printable-a4, .printable-a4 * { visibility: visible; }
               html, body, #root, main { background: white !important; color: black !important; height: auto !important; overflow: visible !important; display: block !important; }
@@ -203,16 +401,12 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
         </style>
 
         <div className="flex justify-between items-center mb-6 no-print">
-          <button onClick={() => setView('list')} className="text-slate-400 text-sm font-medium hover:text-white transition-colors">
-            ← Voltar
-          </button>
-          <button onClick={() => window.print()} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 shadow-md transition-all flex gap-2 items-center">
-            🖨️ Imprimir Folha A4
-          </button>
+          <button onClick={() => setView('list')} className="text-slate-400 text-sm font-medium hover:text-white transition-colors">← Voltar</button>
+          <button onClick={() => window.print()} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 shadow-md transition-all flex gap-2 items-center">🖨️ Imprimir Folha A4</button>
         </div>
         
         <div className="printable-a4 bg-[#151c2c] rounded-2xl border border-slate-800/60 shadow-xl overflow-hidden min-h-[297mm]">
-          <div className="p-8 md:p-10 border-b border-slate-800/60 print-border-black print-bg-gray">
+          <div className="p-8 border-b border-slate-800/60 print-border-black print-bg-gray">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-white print-text-black uppercase tracking-tight">Ficha de Treino</h1>
@@ -230,57 +424,59 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
             </div>
           </div>
 
-          <div className="p-8 md:p-10 space-y-8">
-            <div className="space-y-6">
-              <h3 className="text-sm font-bold text-slate-200 print-text-black mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
-                Estrutura e Exercícios
-              </h3>
-              
-              {/* APRESENTA APENAS EXERCÍCIOS VÁLIDOS */}
-              {validExercises.length === 0 ? (
-                <p className="text-sm text-slate-400 print-text-gray italic">Nenhum exercício detalhado para esta sessão.</p>
-              ) : (
-                <div className="grid grid-cols-1 gap-6">
-                  {validExercises.map((ex: any, idx: number) => (
-                    <div key={idx} className="avoid-page-break bg-[#0f1523]/50 print-bg-gray p-5 rounded-xl border border-slate-800/60 print-border-black">
-                      <div className="flex justify-between items-start mb-3">
-                        <h4 className="text-base font-bold text-white print-text-black">
-                          {idx + 1}. {ex.title || ex.name || 'Exercício'}
-                        </h4>
-                        {ex.duration && (
-                          <span className="text-xs font-bold text-slate-400 print-text-gray bg-slate-800/50 print-bg-gray px-2 py-1 rounded">
-                            ⏳ {ex.duration} min
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed">
-                        {ex.description || 'Sem descrição.'}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {current.finalAppreciation && (
-              <div className="avoid-page-break mt-8">
-                <h3 className="text-sm font-bold text-slate-200 print-text-black mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-2">
+          <div className="p-8 space-y-8">
+            
+            {/* O QUADRO TÁTICO NA IMPRESSÃO */}
+            {current.board_image && (
+              <div className="avoid-page-break mb-8">
+                <h3 className="text-sm font-bold text-slate-200 print-text-black mb-3 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-2">
                   <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
-                  Observações Finais / Gestão
+                  Esquema Tático / Exercício
                 </h3>
-                <div className="bg-[#0f1523]/50 print-bg-gray p-5 rounded-xl border border-slate-800/60 print-border-black">
-                  <p className="text-sm text-slate-300 print-text-black whitespace-pre-wrap leading-relaxed">
-                    {current.finalAppreciation}
-                  </p>
+                <div className="w-full flex justify-center bg-[#090e17] rounded-xl overflow-hidden border border-slate-700/50 print-border-black">
+                  <img src={current.board_image} alt="Quadro Tático" className="max-h-[350px] w-full object-contain" />
                 </div>
               </div>
             )}
 
-            <div className="hidden print:block avoid-page-break mt-12">
-               <h3 className="text-sm font-bold text-black mb-4 uppercase tracking-wider">Esquema Tático / Notas Manuais</h3>
-               <div className="border-2 border-dashed border-gray-400 h-64 rounded-xl w-full"></div>
-            </div>
+            {validExercises.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-200 print-text-black mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
+                  Estrutura
+                </h3>
+                <div className="grid grid-cols-1 gap-4">
+                  {validExercises.map((ex: any, idx: number) => (
+                    <div key={idx} className="avoid-page-break bg-[#0f1523]/50 print-bg-gray p-4 rounded-xl border border-slate-800/60 print-border-black">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="text-base font-bold text-white print-text-black">{idx + 1}. {ex.title || ex.name || 'Exercício'}</h4>
+                        {ex.duration && <span className="text-xs font-bold text-slate-400 print-text-gray bg-slate-800/50 print-bg-gray px-2 py-1 rounded">⏳ {ex.duration} min</span>}
+                      </div>
+                      <p className="text-sm text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed">{ex.description || 'Sem descrição.'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {current.finalAppreciation && (
+              <div className="avoid-page-break mt-8">
+                <h3 className="text-sm font-bold text-slate-200 print-text-black mb-3 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
+                  Observações Finais
+                </h3>
+                <div className="bg-[#0f1523]/50 print-bg-gray p-4 rounded-xl border border-slate-800/60 print-border-black">
+                  <p className="text-sm text-slate-300 print-text-black whitespace-pre-wrap leading-relaxed">{current.finalAppreciation}</p>
+                </div>
+              </div>
+            )}
+
+            {!current.board_image && (
+              <div className="hidden print:block avoid-page-break mt-10">
+                 <h3 className="text-sm font-bold text-black mb-3 uppercase tracking-wider">Anotações Manuais</h3>
+                 <div className="border-2 border-dashed border-gray-400 h-64 rounded-xl w-full"></div>
+              </div>
+            )}
 
           </div>
         </div>
@@ -288,7 +484,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     );
   }
 
-  // VISTA 3: FORMULÁRIO COM CONSTRUTOR DE EXERCÍCIOS OPCIONAIS
+  // VISTA 3: FORMULÁRIO COM DESENHO TÁTICO
   return (
     <div className="p-2 md:p-6 max-w-4xl mx-auto">
       <div className="bg-[#151c2c] p-6 md:p-8 rounded-2xl border border-slate-800/60 shadow-lg">
@@ -300,13 +496,19 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
         <form onSubmit={handleSave} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 bg-slate-800/20 p-5 rounded-xl border border-slate-800/60">
             <div className="md:col-span-1">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Data do Treino *</label>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Data *</label>
               <input required type="date" name="date" defaultValue={current?.date} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Tema Principal *</label>
-              <input required type="text" name="theme" defaultValue={current?.theme} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="Ex: Organização Defensiva e Transição Rápida" />
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Tema *</label>
+              <input required type="text" name="theme" defaultValue={current?.theme} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="Ex: Transição Defensiva" />
             </div>
+          </div>
+
+          {/* NOVO: QUADRO TÁTICO */}
+          <div className="border-t border-slate-800/60 pt-6">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Quadro Tático (Desenhe o Exercício)</label>
+            <TacticalCanvas defaultImage={boardImage} onChange={(img) => setBoardImage(img)} />
           </div>
 
           <div className="border-t border-slate-800/60 pt-6">
@@ -325,18 +527,16 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
               <div className="space-y-4">
                 {exercises.map((ex, index) => (
                   <div key={index} className="bg-[#0f1523] p-4 rounded-xl border border-slate-700/80 relative group">
-                    <button type="button" onClick={() => removeExercise(index)} className="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-sm font-bold transition-colors" title="Remover Exercício">✕</button>
-                    
-                    {/* TODOS OS CAMPOS DOS EXERCÍCIOS SÃO AGORA OPCIONAIS (sem required) */}
+                    <button type="button" onClick={() => removeExercise(index)} className="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-sm font-bold transition-colors">✕</button>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3 pr-8">
                       <div className="md:col-span-3">
-                        <input type="text" placeholder={`Exercício ${index + 1} (Ex: Posse de Bola 5x5)`} value={ex.title || ex.name || ''} onChange={(e) => updateExercise(index, 'title', e.target.value)} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none font-semibold" />
+                        <input type="text" placeholder={`Exercício ${index + 1}`} value={ex.title || ex.name || ''} onChange={(e) => updateExercise(index, 'title', e.target.value)} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none font-semibold" />
                       </div>
                       <div className="md:col-span-1">
                         <input type="text" placeholder="Duração (min)" value={ex.duration || ''} onChange={(e) => updateExercise(index, 'duration', e.target.value)} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none text-center" />
                       </div>
                     </div>
-                    <textarea placeholder="Descrição do exercício, regras, dimensões do espaço..." value={ex.description || ''} onChange={(e) => updateExercise(index, 'description', e.target.value)} rows={3} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none custom-scrollbar leading-relaxed"></textarea>
+                    <textarea placeholder="Descrição do exercício..." value={ex.description || ''} onChange={(e) => updateExercise(index, 'description', e.target.value)} rows={3} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none custom-scrollbar leading-relaxed"></textarea>
                   </div>
                 ))}
               </div>
@@ -344,12 +544,12 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
           </div>
 
           <div className="border-t border-slate-800/60 pt-6">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Foco / Observações da Equipa Técnica</label>
-            <textarea name="finalAppreciation" defaultValue={current?.finalAppreciation} rows={3} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all custom-scrollbar leading-relaxed" placeholder="Atletas em gestão de esforço, dinâmicas a avaliar..."></textarea>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Foco / Observações da Equipa</label>
+            <textarea name="finalAppreciation" defaultValue={current?.finalAppreciation} rows={3} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all custom-scrollbar leading-relaxed"></textarea>
           </div>
 
           <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3.5 rounded-lg shadow-md transition-colors text-sm mt-4">
-            {current ? 'Guardar Alterações da Sessão' : 'Criar Sessão de Treino'}
+            {current ? 'Guardar Alterações' : 'Criar Sessão'}
           </button>
         </form>
       </div>
