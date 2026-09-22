@@ -39,8 +39,12 @@ export interface Player {
 
 export interface IndividualEval {
   playerId: string;
-  rating: number; // ex: 1 a 5 ou 1 a 10
+  rating?: number;
   notes?: string;
+  minutesPlayed?: number;
+  status?: string; // 'titular' | 'suplente' | 'nao_utilizado' | 'nao_convocado'
+  positives?: string;
+  negatives?: string;
 }
 
 export interface MatchReport {
@@ -58,7 +62,7 @@ export interface MatchReport {
   ownFinalSystem?: string;
   ownTeamPositives?: string;
   ownTeamNegatives?: string;
-  goalsScored?: number;
+  goalsScored?: number | any[];
   goalsConceded?: number;
   individualEvals?: IndividualEval[];
 }
@@ -69,7 +73,7 @@ export interface ExercisePlan {
   name?: string;
   duration?: string;
   description?: string;
-  board_image?: string; // Suporte para o Quadro Tático por exercício
+  board_image?: string;
 }
 
 export interface TrainingPlan {
@@ -80,6 +84,19 @@ export interface TrainingPlan {
   exercises?: ExercisePlan[];
   finalAppreciation?: string;
   board_image?: string;
+}
+
+export interface TrainingEvaluation {
+  id?: string;
+  teamId?: string;
+  date: string;
+  playerId?: string;
+  playerName?: string;
+  attendance?: string;
+  intensity?: number;
+  focus?: number;
+  notes?: string;
+  evaluations?: any[];
 }
 
 export interface FutureOpponentScouting {
