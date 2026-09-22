@@ -42,7 +42,7 @@ export interface IndividualEval {
   rating?: number;
   notes?: string;
   minutesPlayed?: number;
-  status?: string; // 'titular' | 'suplente' | 'nao_utilizado' | 'nao_convocado'
+  status?: string;
   positives?: string;
   negatives?: string;
 }
@@ -62,8 +62,8 @@ export interface MatchReport {
   ownFinalSystem?: string;
   ownTeamPositives?: string;
   ownTeamNegatives?: string;
-  goalsScored?: number | any[];
-  goalsConceded?: number;
+  goalsScored?: any;
+  goalsConceded?: any;
   individualEvals?: IndividualEval[];
 }
 
@@ -97,6 +97,10 @@ export interface TrainingEvaluation {
   focus?: number;
   notes?: string;
   evaluations?: any[];
+  performance?: number;
+  strengths?: string;
+  weaknesses?: string;
+  observations?: string;
 }
 
 export interface FutureOpponentScouting {
