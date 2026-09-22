@@ -1,164 +1,246 @@
-// src/AdminModule.tsx
-import React, { useState } from 'react';
-import { StaffMember, UserRole } from './types';
+import React, { useState, useEffect } from 'react';
+import { supabase } from './supabase';
 
-interface AdminModuleProps {
-  staff: StaffMember[];
-  onAddStaff: (member: StaffMember) => void;
+interface StaffMemberExtended {
+  id: string;
+  name: string;
+  role: string;
+  username: string;
+  password?: string;
+  phone?: string;
+  address?: string;
+  age?: number;
 }
 
-export default function AdminModule({ staff, onAddStaff }: AdminModuleProps) {
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+// Aceita props de forma invisível para não dar erro no App.tsx, 
+// mas vai buscar os dados diretamente ao Supabase para ser autónomo.
+export default function AdminModule(props: any) {
+  const [staffList, setStaffList] = useState<StaffMemberExtended[]>([]);
+  const [view, setView] = useState<'list' | 'form'>('list');
+  const [current, setCurrent] = useState<StaffMemberExtended | null>(null);
+  const [loading, setLoading] = useState(true);
 
-    const newStaff: StaffMember = {
-      id: Date.now().toString(),
-      username: formData.get('username') as string,
-      password: formData.get('password') as string,
-      name: formData.get('name') as string,
-      age: formData.get('age') as string,
-      address: formData.get('address') as string,
-      phone: formData.get('phone') as string,
-      role: formData.get('role') as UserRole,
-    };
+  // Vai buscar o staff ativo (para saber quem não se pode auto-eliminar)
+  const currentUser = JSON.parse(localStorage.getItem('scoutpro_user') || '{}');
 
-    onAddStaff(newStaff);
-    e.currentTarget.reset();
-    alert('Membro da equipa técnica adicionado com sucesso!');
+  const fetchStaff = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('*')
+        .order('role')
+        .order('name');
+      
+      if (error) throw error;
+      if (data) setStaffList(data);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  useEffect(() => {
+    fetchStaff();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    
+    const payload = {
+      name: fd.get('name') as string,
+      role: fd.get('role') as string,
+      username: fd.get('username') as string,
+      password: fd.get('password') as string,
+      phone: fd.get('phone') as string,
+      address: fd.get('address') as string,
+      age: Number(fd.get('age')) || null,
+    };
+
+    try {
+      if (current?.id) {
+        // Atualizar existente
+        const { error } = await supabase.from('staff').update(payload).eq('id', current.id);
+        if (error) throw error;
+      } else {
+        // Criar novo
+        const { error } = await supabase.from('staff').insert([payload]);
+        if (error) throw error;
+      }
+      
+      // Sincronização invisível global
+      window.location.reload();
+    } catch (err: any) {
+      alert(`Erro ao guardar: ${err.message}`);
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (id === currentUser.id) {
+      alert("Não se pode eliminar a si próprio!");
+      return;
+    }
+    
+    if (!window.confirm(`Tem a certeza que deseja eliminar o acesso de ${name}? Esta ação não pode ser revertida.`)) return;
+    
+    try {
+      const { error } = await supabase.from('staff').delete().eq('id', id);
+      if (error) throw error;
+      window.location.reload();
+    } catch (err: any) {
+      alert(`Erro ao eliminar: ${err.message}`);
+    }
+  };
+
+  const openForm = (staff: StaffMemberExtended | null = null) => {
+    setCurrent(staff);
+    setView('form');
+  };
+
+  // ==========================================
+  // VISTA 1: GRELHA DE STAFF
+  // ==========================================
+  if (view === 'list') {
+    return (
+      <div className="p-2 md:p-6 max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-black text-white">Equipa Técnica</h2>
+            <p className="text-slate-400">Gira as credenciais, dados e permissões do seu staff.</p>
+          </div>
+          <button onClick={() => openForm()} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-500 shadow-md transition-colors flex gap-2 items-center">
+            <span>+</span> Novo Membro
+          </button>
+        </div>
+
+        {loading ? (
+          <p className="text-slate-400">A carregar acessos...</p>
+        ) : staffList.length === 0 ? (
+          <div className="bg-slate-800 p-10 rounded-2xl border border-slate-700 text-center">
+            <h3 className="text-white font-bold text-lg">Sem Staff</h3>
+            <p className="text-slate-400 mt-2">Adicione membros para lhes dar acesso à plataforma.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {staffList.map(member => (
+              <div key={member.id} className={`bg-slate-800 p-6 rounded-2xl border ${member.id === currentUser.id ? 'border-blue-500/50 shadow-blue-900/20' : 'border-slate-700'} shadow-lg hover:border-slate-500 transition-colors relative flex flex-col h-full`}>
+                
+                {member.id === currentUser.id && (
+                  <div className="absolute top-4 right-4 bg-blue-600 text-white text-[10px] font-black uppercase px-2 py-1 rounded-md">Você</div>
+                )}
+                
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="w-14 h-14 rounded-full bg-slate-700 flex items-center justify-center text-xl font-black text-white shadow-inner">
+                    {member.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white leading-tight">{member.name}</h3>
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">{member.role}</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 mb-6 flex-1">
+                  <p className="text-sm text-slate-400 flex items-center gap-2">
+                    <span>📧</span> <span className="font-semibold text-slate-300">{member.username}</span>
+                  </p>
+                  <p className="text-sm text-slate-400 flex items-center gap-2">
+                    <span>📱</span> {member.phone || 'Sem contacto'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-auto">
+                  <button onClick={() => openForm(member)} className="bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-bold transition-colors">
+                    Editar
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(member.id, member.name)} 
+                    disabled={member.id === currentUser.id}
+                    className={`py-2 rounded-lg text-sm font-bold border transition-all ${member.id === currentUser.id ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed' : 'bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border-red-500/20'}`}
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ==========================================
+  // VISTA 2: FORMULÁRIO (CRIAR / EDITAR)
+  // ==========================================
   return (
-    <div className="p-4 bg-white rounded shadow">
-      <h2 className="text-xl font-bold mb-4 border-b pb-2 text-purple-800">
-        Gestão da Equipa Técnica
-      </h2>
-
-      <form
-        onSubmit={handleSubmit}
-        className="space-y-4 mb-8 bg-purple-50 p-4 rounded border border-purple-100"
-      >
-        <h3 className="font-semibold text-purple-900 mb-2">
-          Adicionar Novo Membro
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium">Nome Completo</label>
-            <input
-              type="text"
-              name="name"
-              required
-              className="w-full mt-1 p-2 border rounded"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Função</label>
-            <select
-              name="role"
-              required
-              className="w-full mt-1 p-2 border rounded"
-            >
-              <option value="">Selecione a função...</option>
-              <option value="Treinador Principal">Treinador Adjunto</option>
-              <option value="Treinador Adjunto">Treinador Adjunto</option>
-              <option value="Treinador de Guarda Redes">
-                Treinador de Guarda Redes
-              </option>
-              <option value="Observador">Observador</option>
-              <option value="Preparador Físico">Preparador Físico</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Idade</label>
-            <input
-              type="number"
-              name="age"
-              required
-              className="w-full mt-1 p-2 border rounded"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">
-              Contacto Telefónico
-            </label>
-            <input
-              type="tel"
-              name="phone"
-              required
-              className="w-full mt-1 p-2 border rounded"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium">Morada</label>
-            <input
-              type="text"
-              name="address"
-              required
-              className="w-full mt-1 p-2 border rounded"
-            />
-          </div>
-          <div className="pt-4 border-t border-purple-200 md:col-span-2 grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-blue-700">
-                Nome de Utilizador (Login)
-              </label>
-              <input
-                type="text"
-                name="username"
-                required
-                className="w-full mt-1 p-2 border rounded"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-blue-700">
-                Palavra-passe provisória
-              </label>
-              <input
-                type="text"
-                name="password"
-                required
-                className="w-full mt-1 p-2 border rounded"
-              />
-            </div>
-          </div>
+    <div className="p-2 md:p-6 max-w-4xl mx-auto">
+      <div className="bg-slate-800 p-6 md:p-10 rounded-3xl border border-slate-700 shadow-xl">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-2xl font-black text-white">{current ? 'Editar Membro' : 'Novo Membro da Equipa Técnica'}</h2>
+          <button onClick={() => setView('list')} className="text-slate-400 hover:text-white font-bold">✕ Cancelar</button>
         </div>
 
-        <button
-          type="submit"
-          className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 mt-4"
-        >
-          Criar Conta
-        </button>
-      </form>
-
-      {/* Lista de Staff */}
-      <div>
-        <h3 className="font-bold text-lg mb-2">Equipa Técnica Atual</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {staff.map((member) => (
-            <div key={member.id} className="p-3 border rounded bg-gray-50">
-              <div className="font-bold text-lg">{member.name}</div>
-              <div className="text-purple-600 font-semibold text-sm mb-2">
-                {member.role}
+        <form onSubmit={handleSave} className="space-y-6">
+          
+          {/* SECÇÃO 1: ACESSO */}
+          <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-700">
+            <h3 className="text-blue-400 font-bold mb-4 uppercase text-xs tracking-wider">Credenciais de Acesso</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2">Email (Login) *</label>
+                <input required type="email" name="username" defaultValue={current?.username} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
-              <div className="text-sm text-gray-600">
-                <p>
-                  <strong>Idade:</strong> {member.age} anos
-                </p>
-                <p>
-                  <strong>Tel:</strong> {member.phone}
-                </p>
-                <p>
-                  <strong>Morada:</strong> {member.address}
-                </p>
-                <p className="mt-2 text-xs text-gray-400">
-                  Login: {member.username}
-                </p>
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2">Password *</label>
+                <input required type="text" name="password" defaultValue={current?.password} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••" />
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+
+          {/* SECÇÃO 2: DADOS PESSOAIS */}
+          <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-700">
+            <h3 className="text-blue-400 font-bold mb-4 uppercase text-xs tracking-wider">Perfil</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2">Nome Completo *</label>
+                <input required type="text" name="name" defaultValue={current?.name} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2">Cargo *</label>
+                <select required name="role" defaultValue={current?.role || 'Treinador Adjunto'} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                  <option>Administrador</option>
+                  <option>Treinador Principal</option>
+                  <option>Treinador Adjunto</option>
+                  <option>Treinador de Guarda-Redes</option>
+                  <option>Preparador Físico</option>
+                  <option>Observador / Scout</option>
+                  <option>Fisioterapeuta</option>
+                  <option>Diretor</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+              <div className="col-span-1">
+                <label className="block text-sm font-bold text-slate-300 mb-2">Telemóvel</label>
+                <input type="text" name="phone" defaultValue={current?.phone} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: 912 345 678" />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-sm font-bold text-slate-300 mb-2">Idade</label>
+                <input type="number" name="age" defaultValue={current?.age} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div className="col-span-3">
+                <label className="block text-sm font-bold text-slate-300 mb-2">Morada</label>
+                <input type="text" name="address" defaultValue={current?.address} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg transition-colors text-lg mt-4">
+            {current ? 'Atualizar Membro' : 'Criar Acesso'}
+          </button>
+        </form>
       </div>
     </div>
   );
