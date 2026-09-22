@@ -21,13 +21,13 @@ interface PlayerExtended {
   weight_history: WeightRecord[];
 }
 
-export default function PlayersModule({ players, onAddPlayer }: any) {
+export default function PlayersModule(props: any) {
   const [extPlayers, setExtPlayers] = useState<PlayerExtended[]>([]);
   const [view, setView] = useState<'grid' | 'form' | 'details'>('grid');
   const [current, setCurrent] = useState<PlayerExtended | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Vai buscar a equipa ativa à memória que criámos no App.tsx
+  // Vai buscar a equipa ativa à memória
   const activeTeam = JSON.parse(localStorage.getItem('scoutpro_active_team') || '{}');
 
   const fetchPlayers = async () => {
@@ -85,8 +85,7 @@ export default function PlayersModule({ players, onAddPlayer }: any) {
         await supabase.from('players').insert([payload]);
       }
       
-      // Sincronização invisível: Recarrega a página levemente para atualizar 
-      // o Tático e os Jogos no App.tsx (sem perder a página nem a equipa!)
+      // Sincronização invisível
       window.location.reload();
     } catch (err: any) {
       alert("Erro ao guardar: " + err.message);
@@ -113,9 +112,6 @@ export default function PlayersModule({ players, onAddPlayer }: any) {
     setView('details');
   };
 
-  // ==========================================
-  // VISTA 1: GRELHA DE JOGADORES
-  // ==========================================
   if (view === 'grid') {
     return (
       <div className="p-2 md:p-6 max-w-7xl mx-auto">
@@ -187,9 +183,6 @@ export default function PlayersModule({ players, onAddPlayer }: any) {
     );
   }
 
-  // ==========================================
-  // VISTA 2: DETALHES DO JOGADOR
-  // ==========================================
   if (view === 'details' && current) {
     return (
       <div className="p-2 md:p-6 max-w-4xl mx-auto">
@@ -261,9 +254,6 @@ export default function PlayersModule({ players, onAddPlayer }: any) {
     );
   }
 
-  // ==========================================
-  // VISTA 3: FORMULÁRIO (CRIAR / EDITAR)
-  // ==========================================
   return (
     <div className="p-2 md:p-6 max-w-4xl mx-auto">
       <div className="bg-slate-800 p-6 md:p-10 rounded-3xl border border-slate-700 shadow-xl">
