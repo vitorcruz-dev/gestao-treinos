@@ -1,366 +1,268 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from './supabase'; 
-import Dashboard from './Dashboard';
-import TrainingModule from './TrainingModule';
-import TrainingPlannerModule from './TrainingPlannerModule';
-import MatchModule from './MatchModule';
-import AdminModule from './AdminModule';
-import PlayersModule from './PlayersModule';
-import TacticalBoard from './TacticalBoard';
-import StatsModule from './StatsModule';
-import FutureScoutingModule from './FutureScoutingModule';
-import MyAccount from './MyAccount'; 
-import Login from './Login';
-import TeamSelection from './TeamSelection';
-import { StaffMember, Player, MatchReport, FutureOpponentScouting, Team, TrainingPlan } from './types';
+import React, { useState, useEffect } from 'react';
+import { supabase } from './supabase';
 
-type TabType = 'dashboard' | 'training_plan' | 'training' | 'match' | 'future_scouting' | 'admin' | 'players' | 'tactics' | 'stats' | 'account';
-const TIMEOUT_MS = 15 * 60 * 1000; 
+interface StaffMemberExtended {
+  id: string;
+  name: string;
+  role: string;
+  username: string;
+  password?: string;
+  phone?: string;
+  address?: string;
+  age?: number;
+}
 
-const mapStaff = (row: any): StaffMember => ({ id: row.id, username: row.username, password: row.password, name: row.name, age: row.age, address: row.address, phone: row.phone, role: row.role });
-const mapTeam = (row: any): Team => ({ id: row.id, year: row.year, club: row.club, name: row.name });
-const mapPlayer = (row: any): Player => ({ id: row.id, teamId: row.team_id, name: row.name, age: row.age, position: row.position, preferredFoot: row.preferred_foot, birthDate: row.birth_date, notes: row.notes, photoUrl: row.photo_url });
-const mapMatch = (row: any): MatchReport => ({ id: row.id, teamId: row.team_id, date: row.date, opponent: row.opponent, oppTacticalSystem: row.opp_tactical_system, oppBehaviorWinning: row.opp_behavior_winning, oppBehaviorLosing: row.opp_behavior_losing, oppSubstitutions: row.opp_substitutions, oppSetPieces: row.opp_set_pieces, oppFinalEval: row.opp_final_eval, ownInitialSystem: row.own_initial_system, ownFinalSystem: row.own_final_system, ownTeamPositives: row.own_team_positives, ownTeamNegatives: row.own_team_negatives, goalsScored: row.goals_scored, goalsConceded: row.goals_conceded, individualEvals: row.individual_evals });
-const mapPlan = (row: any): TrainingPlan => ({ id: row.id, teamId: row.team_id, date: row.date, theme: row.theme, exercises: row.exercises, finalAppreciation: row.final_appreciation });
-const mapScouting = (row: any): FutureOpponentScouting => ({ id: row.id, teamId: row.team_id, opponentName: row.opponent_name, observationDate: row.observation_date, tacticalModel: row.tactical_model, behaviorWinning: row.behavior_winning, behaviorLosing: row.behavior_losing, substitutionsImpact: row.substitutions_impact, setPieces: row.set_pieces, setPiecesPhotoUrl: row.set_pieces_photo_url, strengths: row.strengths, weaknesses: row.weaknesses, strongPlayers: row.strong_players, weakPlayers: row.weak_players, observations: row.observations });
+export default function AdminModule() {
+  const [staffList, setStaffList] = useState<StaffMemberExtended[]>([]);
+  const [view, setView] = useState<'list' | 'form'>('list');
+  const [current, setCurrent] = useState<StaffMemberExtended | null>(null);
+  const [loading, setLoading] = useState(true);
 
-export default function App() {
-  const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [playersList, setPlayersList] = useState<Player[]>([]);
-  const [matchReports, setMatchReports] = useState<MatchReport[]>([]); 
-  const [futureReports, setFutureReports] = useState<FutureOpponentScouting[]>([]);
-  const [trainingPlans, setTrainingPlans] = useState<TrainingPlan[]>([]);
-  
-  const [currentUser, setCurrentUser] = useState<StaffMember | null>(() => {
-    const savedUser = localStorage.getItem('scoutpro_user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const [modal, setModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    onConfirm: (() => void) | null;
+    type: 'alert' | 'confirm';
+  }>({ show: false, title: '', message: '', onConfirm: null, type: 'alert' });
 
-  // ESTADO PARA BLOQUEAR ACESSO COM PASS PROVISÓRIA
-  const [pendingPasswordChangeUser, setPendingPasswordChangeUser] = useState<StaffMember | null>(null);
-  
-  const [loginError, setLoginError] = useState('');
-  
-  const [activeTeam, setActiveTeam] = useState<Team | null>(() => {
-    const savedTeam = localStorage.getItem('scoutpro_active_team');
-    return savedTeam ? JSON.parse(savedTeam) : null;
-  });
+  const currentUser = JSON.parse(localStorage.getItem('scoutpro_user') || '{}');
 
-  useEffect(() => {
-    if (activeTeam) {
-      localStorage.setItem('scoutpro_active_team', JSON.stringify(activeTeam));
-    } else {
-      localStorage.removeItem('scoutpro_active_team');
+  const fetchStaff = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('*')
+        .order('role')
+        .order('name');
+      
+      if (error) throw error;
+      if (data) setStaffList(data);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-  }, [activeTeam]);
-
-  const [activeTab, setActiveTab] = useState<TabType>(() => {
-    const savedTab = localStorage.getItem('scoutpro_active_tab');
-    return (savedTab as TabType) || 'dashboard';
-  });
-  
-  const [tabHistory, setTabHistory] = useState<TabType[]>([activeTab]);
-
-  useEffect(() => {
-    localStorage.setItem('scoutpro_active_tab', activeTab);
-    
-    setTabHistory(prev => {
-      if (prev[prev.length - 1] === activeTab) return prev;
-      const newHistory = [...prev, activeTab];
-      if (newHistory.length > 15) newHistory.shift(); 
-      return newHistory;
-    });
-  }, [activeTab]);
-
-  const handleGoBack = () => {
-    setTabHistory(prev => {
-      if (prev.length > 1) {
-        const newHistory = [...prev];
-        newHistory.pop(); 
-        const previousTab = newHistory[newHistory.length - 1]; 
-        setActiveTab(previousTab);
-        return newHistory;
-      }
-      setActiveTab('dashboard'); 
-      return ['dashboard'];
-    });
   };
 
   useEffect(() => {
-    supabase.from('staff').select('*').then(({ data }) => { if (data) setStaffList(data.map(mapStaff)); });
-    if (currentUser) {
-      supabase.from('teams').select('*').order('year', { ascending: false }).then(({ data }) => { if (data) setTeams(data.map(mapTeam)); });
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (!activeTeam) return;
-    const loadTeamData = async () => {
-      const [p, m, t, f] = await Promise.all([
-        supabase.from('players').select('*').eq('team_id', activeTeam.id),
-        supabase.from('match_reports').select('*').eq('team_id', activeTeam.id).order('date', { ascending: false }),
-        supabase.from('training_plans').select('*').eq('team_id', activeTeam.id).order('date', { ascending: false }),
-        supabase.from('future_scouting').select('*').eq('team_id', activeTeam.id).order('observation_date', { ascending: false })
-      ]);
-      if (p.data) setPlayersList(p.data.map(mapPlayer));
-      if (m.data) setMatchReports(m.data.map(mapMatch));
-      if (t.data) setTrainingPlans(t.data.map(mapPlan));
-      if (f.data) setFutureReports(f.data.map(mapScouting));
-    };
-    loadTeamData();
-  }, [activeTeam]);
-
-  const updateActivity = useCallback(() => {
-    if (currentUser) localStorage.setItem('scoutpro_last_activity', Date.now().toString());
-  }, [currentUser]);
-
-  const handleLogout = useCallback(() => {
-    setCurrentUser(null); setActiveTeam(null); setPendingPasswordChangeUser(null);
-    localStorage.removeItem('scoutpro_user'); 
-    localStorage.removeItem('scoutpro_last_activity');
-    localStorage.removeItem('scoutpro_active_tab'); 
-    localStorage.removeItem('scoutpro_active_team'); 
+    fetchStaff();
   }, []);
 
-  useEffect(() => {
-    if (!currentUser) return;
-    const intervalId = setInterval(() => {
-      const lastActivity = parseInt(localStorage.getItem('scoutpro_last_activity') || '0', 10);
-      if (Date.now() - lastActivity > TIMEOUT_MS) { handleLogout(); alert('Sessão terminada por inatividade.'); }
-    }, 30000);
-    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
-    events.forEach(event => window.addEventListener(event, updateActivity));
-    return () => { clearInterval(intervalId); events.forEach(event => window.removeEventListener(event, updateActivity)); };
-  }, [currentUser, handleLogout, updateActivity]);
+  const openAlert = (title: string, message: string) => setModal({ show: true, title, message, onConfirm: null, type: 'alert' });
+  const openConfirm = (title: string, message: string, onConfirm: () => void) => setModal({ show: true, title, message, onConfirm, type: 'confirm' });
+  const closeModal = () => setModal(prev => ({ ...prev, show: false }));
 
-  // LOGIN ATUALIZADO COM VERIFICAÇÃO DE PASS PROVISÓRIA
-  const handleLogin = async (user: string, pass: string) => {
-    const { data } = await supabase.from('staff').select('*').eq('username', user).eq('password', pass).single();
-    if (data) { 
-      const u = mapStaff(data);
-      if (data.must_change_password) {
-        setPendingPasswordChangeUser(u);
-        setLoginError('');
-      } else {
-        setCurrentUser(u); setLoginError(''); setActiveTeam(null);
-        localStorage.setItem('scoutpro_user', JSON.stringify(u));
-        localStorage.setItem('scoutpro_last_activity', Date.now().toString());
-      }
-    } else setLoginError('Email ou palavra-passe incorretos.');
-  };
-
-  const handleForcePasswordSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const p1 = fd.get('p1') as string;
-    const p2 = fd.get('p2') as string;
+    
+    // Agora o payload aceita o campo de alteração obrigatória
+    const payload: any = {
+      name: fd.get('name') as string,
+      role: fd.get('role') as string,
+      username: fd.get('username') as string,
+      password: fd.get('password') as string,
+      phone: fd.get('phone') as string,
+      address: fd.get('address') as string,
+      age: Number(fd.get('age')) || null,
+    };
 
-    if (p1 !== p2) {
-      alert("As senhas não coincidem!");
-      return;
-    }
-    if (p1.length < 6) {
-      alert("A nova senha deve ter pelo menos 6 caracteres.");
-      return;
-    }
-
-    if (pendingPasswordChangeUser) {
-      const { error } = await supabase.from('staff').update({ password: p1, must_change_password: false }).eq('id', pendingPasswordChangeUser.id);
-      if (!error) {
-        const u = { ...pendingPasswordChangeUser, password: p1 };
-        setCurrentUser(u);
-        setPendingPasswordChangeUser(null);
-        localStorage.setItem('scoutpro_user', JSON.stringify(u));
-        localStorage.setItem('scoutpro_last_activity', Date.now().toString());
+    try {
+      if (current?.id) {
+        // Se a password for alterada durante a edição, forçar alteração no login!
+        if (payload.password !== current.password) {
+          payload.must_change_password = true;
+        }
+        const { error } = await supabase.from('staff').update(payload).eq('id', current.id);
+        if (error) throw error;
       } else {
-        alert("Erro ao alterar senha: " + error.message);
+        // Contas novas obrigam sempre à alteração da password no primeiro login
+        payload.must_change_password = true;
+        const { error } = await supabase.from('staff').insert([payload]);
+        if (error) throw error;
       }
+      window.location.reload();
+    } catch (err: any) {
+      openAlert("Erro", `Erro ao guardar: ${err.message}`);
     }
   };
 
-  // ECRÃ OBRIGATÓRIO DE NOVA PASSWORD
-  if (pendingPasswordChangeUser) {
+  const handleDeleteClick = (id: string, name: string) => {
+    if (id === currentUser.id) {
+      openAlert("Ação não permitida", "Não pode remover os seus próprios acessos de administrador.");
+      return;
+    }
+    openConfirm("Remover Acesso", `Confirma a remoção do acesso de ${name}? Esta ação é irreversível.`, async () => {
+        try {
+          const { error } = await supabase.from('staff').delete().eq('id', id);
+          if (error) throw error;
+          window.location.reload();
+        } catch (err: any) {
+          openAlert("Erro", `Erro ao eliminar: ${err.message}`);
+        }
+      }
+    );
+  };
+
+  const openForm = (staff: StaffMemberExtended | null = null) => {
+    setCurrent(staff);
+    setView('form');
+  };
+
+  const renderModal = () => {
+    if (!modal.show) return null;
     return (
-      <div className="flex h-screen bg-[#090e17] items-center justify-center p-4">
-        <div className="bg-[#151c2c] border border-slate-800/60 p-8 rounded-2xl w-full max-w-md shadow-2xl">
-          <div className="text-center mb-8">
-            <div className="bg-slate-800/50 w-16 h-16 rounded-2xl flex items-center justify-center border border-slate-700/50 shadow-sm mx-auto mb-4">
-              <span className="text-white font-bold text-xl">SP<span className="text-blue-500">.</span></span>
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Bem-vindo(a), {pendingPasswordChangeUser.name.split(' ')[0]}</h2>
-            <p className="text-slate-400 text-sm">Por questões de segurança, tem de definir uma nova palavra-passe para o seu primeiro acesso.</p>
-          </div>
-          
-          <form onSubmit={handleForcePasswordSubmit} className="space-y-5">
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Nova Palavra-Passe</label>
-              <input required type="password" name="p1" className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="Mínimo 6 caracteres" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Confirmar Palavra-Passe</label>
-              <input required type="password" name="p2" className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="Repita a palavra-passe" />
-            </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-lg shadow-md transition-colors text-sm mt-4">
-              Guardar e Entrar
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0b1121]/80 backdrop-blur-sm p-4">
+        <div className="bg-[#151c2c] border border-slate-700/50 rounded-2xl p-6 md:p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+          <h3 className="text-lg font-bold text-white mb-2">{modal.title}</h3>
+          <p className="text-sm font-medium text-slate-400 mb-8">{modal.message}</p>
+          <div className="flex gap-3 justify-end">
+            {modal.type === 'confirm' && (
+              <button onClick={closeModal} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors">Cancelar</button>
+            )}
+            <button 
+              onClick={() => { if (modal.onConfirm) modal.onConfirm(); else closeModal(); }}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${modal.type === 'confirm' ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'}`}
+            >
+              {modal.type === 'confirm' ? 'Eliminar' : 'OK'}
             </button>
-          </form>
-          <button onClick={() => setPendingPasswordChangeUser(null)} className="w-full text-center text-slate-500 text-xs hover:text-slate-300 mt-6 transition-colors">Voltar ao Login</button>
+          </div>
         </div>
+      </div>
+    );
+  };
+
+  if (view === 'list') {
+    return (
+      <div className="p-2 md:p-6 max-w-5xl mx-auto relative">
+        {renderModal()}
+
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-slate-800 pb-6">
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-1">Equipa Técnica</h2>
+            <p className="text-sm text-slate-400 font-medium">Gestão de acessos, credenciais e permissões.</p>
+          </div>
+          <button onClick={() => openForm()} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-500 shadow-md transition-colors flex gap-2 items-center">
+            <span>+</span> Novo Membro
+          </button>
+        </div>
+
+        {loading ? (
+          <p className="text-sm text-slate-400">A carregar acessos...</p>
+        ) : staffList.length === 0 ? (
+          <div className="bg-[#151c2c] p-10 rounded-2xl border border-slate-800/80 text-center">
+            <h3 className="text-white font-semibold text-base">Sem Staff</h3>
+            <p className="text-sm text-slate-400 mt-1">Adicione membros para lhes dar acesso à plataforma.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {staffList.map(member => (
+              <div key={member.id} className={`bg-[#151c2c] p-3 md:p-4 rounded-xl border ${member.id === currentUser.id ? 'border-blue-500/50 shadow-blue-900/10' : 'border-slate-800/80'} flex flex-col md:flex-row items-center gap-4 hover:border-slate-600 transition-colors relative shadow-sm`}>
+                
+                <div className="w-11 h-11 shrink-0 rounded-full bg-slate-800 flex items-center justify-center text-base font-bold text-slate-300 shadow-sm border border-slate-700">
+                  {member.name.substring(0, 2).toUpperCase()}
+                </div>
+                
+                <div className="flex-1 min-w-[150px] w-full text-center md:text-left">
+                  <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
+                    <h3 className="text-base font-semibold text-slate-100 truncate" title={member.name}>{member.name}</h3>
+                    {member.id === currentUser.id && (
+                      <span className="bg-blue-600/20 text-blue-400 border border-blue-600/30 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md inline-block self-center">Você</span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5 block truncate" title={member.role}>{member.role}</span>
+                </div>
+                
+                <div className="flex flex-col text-xs font-medium text-slate-400 w-full md:w-auto text-center md:text-left shrink-0 mt-1 md:mt-0 md:px-4">
+                  <span className="truncate" title={member.username}>📧 {member.username}</span>
+                  <span className="truncate mt-1" title={member.phone || 'Sem contacto'}>📱 {member.phone || 'S/ Contacto'}</span>
+                </div>
+
+                <div className="flex gap-2 w-full md:w-auto shrink-0 justify-center mt-3 md:mt-0">
+                  <button onClick={() => openForm(member)} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition-colors border border-slate-700">Editar</button>
+                  <button 
+                    onClick={() => handleDeleteClick(member.id, member.name)} 
+                    disabled={member.id === currentUser.id}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${member.id === currentUser.id ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed' : 'bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border-red-500/20'}`}
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
 
-  if (!currentUser) return <Login onLogin={handleLogin} error={loginError} />;
-  const isAdmin = currentUser.role === 'Administrador';
-
-  const handleCreateTeam = async (t: Team) => {
-    const { data } = await supabase.from('teams').insert([{ year: t.year, club: t.club, name: t.name }]).select().single();
-    if (data) setTeams([mapTeam(data), ...teams]);
-  };
-
-  const handleAddTrainingPlan = async (p: TrainingPlan) => {
-    const payload = { team_id: activeTeam!.id, date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation };
-    const { data } = await supabase.from('training_plans').insert([payload]).select().single();
-    if (data) setTrainingPlans([mapPlan(data), ...trainingPlans]);
-  };
-
-  const handleUpdateTrainingPlan = async (p: TrainingPlan) => {
-    const payload = { date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation };
-    const { data } = await supabase.from('training_plans').update(payload).eq('id', p.id).select().single();
-    if (data) {
-      const updated = mapPlan(data);
-      setTrainingPlans(trainingPlans.map(plan => plan.id === updated.id ? updated : plan));
-    }
-  };
-
-  const handleAddMatchReport = async (r: MatchReport) => {
-    const payload = {
-      team_id: activeTeam!.id, date: r.date, opponent: r.opponent, opp_tactical_system: r.oppTacticalSystem, opp_behavior_winning: r.oppBehaviorWinning,
-      opp_behavior_losing: r.oppBehaviorLosing, opp_substitutions: r.oppSubstitutions, opp_set_pieces: r.oppSetPieces, opp_final_eval: r.oppFinalEval,
-      own_initial_system: r.ownInitialSystem, own_final_system: r.ownFinalSystem, own_team_positives: r.ownTeamPositives, own_team_negatives: r.ownTeamNegatives,
-      goals_scored: r.goalsScored, goals_conceded: r.goalsConceded, individual_evals: r.individualEvals
-    };
-    const { data } = await supabase.from('match_reports').insert([payload]).select().single();
-    if (data) setMatchReports([mapMatch(data), ...matchReports]);
-  };
-
-  const handleAddFutureReport = async (r: FutureOpponentScouting) => {
-    const payload = {
-      team_id: activeTeam!.id, opponent_name: r.opponentName, observation_date: r.observationDate, tactical_model: r.tacticalModel, behavior_winning: r.behaviorWinning,
-      behavior_losing: r.behaviorLosing, substitutions_impact: r.substitutionsImpact, set_pieces: r.setPieces, set_pieces_photo_url: r.setPiecesPhotoUrl,
-      strengths: r.strengths, weaknesses: r.weaknesses, strong_players: r.strongPlayers, weak_players: r.weakPlayers, observations: r.observations
-    };
-    const { data } = await supabase.from('future_scouting').insert([payload]).select().single();
-    if (data) setFutureReports([mapScouting(data), ...futureReports]);
-  };
-
-  if (!activeTeam) {
-    return <TeamSelection teams={teams} isAdmin={isAdmin} onSelectTeam={(t) => setActiveTeam(t)} onCreateTeam={handleCreateTeam} onLogout={handleLogout} />;
-  }
-
-  const menuItems = [
-    { id: 'dashboard', label: 'Início', icon: '📊' },
-    { id: 'players', label: 'Plantel', icon: '👕' },
-    { id: 'training_plan', label: 'Planear Treino', icon: '📝' },
-    { id: 'training', label: 'Avaliar Treino', icon: '⚽' },
-    { id: 'match', label: 'Nossos Jogos', icon: '🏆' },
-    { id: 'future_scouting', label: 'Adversários', icon: '🔭' },
-    { id: 'tactics', label: 'Tática', icon: '📋' },
-    { id: 'stats', label: 'Estatísticas', icon: '📈' },
-    { id: 'account', label: 'Minha Conta', icon: '👤' },
-  ];
-
-  if (isAdmin) menuItems.splice(1, 0, { id: 'admin', label: 'Staff', icon: '👥' });
-
   return (
-    <div className="flex h-screen bg-[#090e17] text-slate-200 font-sans overflow-hidden">
-      
-      <aside className="hidden md:flex w-64 bg-[#0f1523] border-r border-slate-800/60 flex-col z-20 shadow-xl">
-        <div className="p-6 border-b border-slate-800/60">
-          <div className="flex items-center justify-between mb-5">
-            <div className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center border border-slate-700/50 shadow-sm"><span className="text-white font-bold text-[11px]">SP<span className="text-blue-500">.</span></span></div>
-            <button onClick={() => setActiveTeam(null)} className="text-[10px] uppercase font-semibold text-slate-500 hover:text-slate-300 transition-colors tracking-wider">Trocar Equipa</button>
-          </div>
-          <h1 className="text-base font-semibold text-white tracking-tight leading-tight truncate">{activeTeam.club}</h1>
-          <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-medium">{activeTeam.name} • {activeTeam.year}</p>
+    <div className="p-2 md:p-6 max-w-3xl mx-auto">
+      <div className="bg-[#151c2c] p-6 md:p-8 rounded-2xl border border-slate-800/80 shadow-lg">
+        <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+          <h2 className="text-xl font-bold text-white">{current ? 'Editar Acesso' : 'Adicionar Elemento ao Staff'}</h2>
+          <button onClick={() => setView('list')} className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancelar</button>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto custom-scrollbar">
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 px-2">Menu Principal</div>
-          {menuItems.map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 text-sm ${activeTab === item.id ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 border border-transparent'}`}>
-              <span className="text-base opacity-80">{item.icon}</span>{item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="p-5 border-t border-slate-800/60 bg-[#0f1523]">
-          <div 
-            onClick={() => setActiveTab('account')}
-            className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600/50 transition-all"
-            title="Ir para as Definições da Conta"
-          >
-            <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-sm">{currentUser.name.charAt(0)}</div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
-              <p className="text-[9px] text-slate-400 truncate uppercase tracking-widest mt-0.5">{currentUser.role}</p>
+        <form onSubmit={handleSave} className="space-y-5">
+          <div className="bg-slate-800/30 p-5 rounded-xl border border-slate-800/80">
+            <h3 className="text-blue-400 font-bold mb-4 uppercase text-[10px] tracking-widest">Dados de Acesso</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Email (Login) *</label>
+                <input required type="email" name="username" defaultValue={current?.username} className="w-full bg-slate-900/80 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Password {current && '(Se alterar, o acesso fica provisório)'}</label>
+                <input required type="text" name="password" defaultValue={current?.password} className="w-full bg-slate-900/80 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="••••••••" />
+              </div>
             </div>
           </div>
-        </div>
-      </aside>
 
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="bg-[#0f1523]/80 backdrop-blur-md border-b border-slate-800/60 px-4 md:px-8 py-3.5 flex justify-between items-center z-10 sticky top-0">
-          
-          <div className="flex items-center gap-3 md:hidden">
-             {activeTab !== 'dashboard' && (
-               <button onClick={handleGoBack} className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 border border-slate-700/50 active:bg-slate-700 transition-colors">
-                 <span className="font-medium text-base leading-none mb-0.5">←</span>
-               </button>
-             )}
-             <div className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center border border-slate-700/50"><span className="text-white font-bold text-[10px]">SP<span className="text-blue-500">.</span></span></div>
-             <div className="flex flex-col"><h1 className="text-xs font-semibold text-white leading-none truncate max-w-[120px]">{activeTeam.club}</h1><span className="text-[8px] text-slate-400 uppercase tracking-widest mt-0.5">{activeTeam.year}</span></div>
-          </div>
-          
-          <div className="hidden md:flex items-center gap-4">
-             {activeTab !== 'dashboard' && (
-               <button onClick={handleGoBack} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700" title="Voltar atrás">
-                 <span className="font-medium text-lg leading-none mb-0.5">←</span>
-               </button>
-             )}
-            <h2 className="text-lg font-semibold text-white tracking-wide">{menuItems.find(m => m.id === activeTab)?.label}</h2>
+          <div className="bg-slate-800/30 p-5 rounded-xl border border-slate-800/80">
+            <h3 className="text-blue-400 font-bold mb-4 uppercase text-[10px] tracking-widest">Informações Pessoais</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Nome Completo *</label>
+                <input required type="text" name="name" defaultValue={current?.name} className="w-full bg-slate-900/80 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Cargo *</label>
+                <select required name="role" defaultValue={current?.role || 'Treinador Adjunto'} className="w-full bg-slate-900/80 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all">
+                  <option>Administrador</option>
+                  <option>Treinador Principal</option>
+                  <option>Treinador Adjunto</option>
+                  <option>Treinador de Guarda-Redes</option>
+                  <option>Preparador Físico</option>
+                  <option>Observador / Scout</option>
+                  <option>Fisioterapeuta</option>
+                  <option>Diretor</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
+              <div className="col-span-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Telemóvel</label>
+                <input type="text" name="phone" defaultValue={current?.phone} className="w-full bg-slate-900/80 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="Ex: 912 345 678" />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Idade</label>
+                <input type="number" name="age" defaultValue={current?.age} className="w-full bg-slate-900/80 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" />
+              </div>
+              <div className="col-span-3">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Morada</label>
+                <input type="text" name="address" defaultValue={current?.address} className="w-full bg-slate-900/80 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" />
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button onClick={() => setActiveTeam(null)} className="md:hidden px-3 py-1.5 rounded-lg font-medium text-[10px] uppercase tracking-wider bg-slate-800/50 text-slate-300 border border-slate-700/50">Trocar</button>
-            <button onClick={handleLogout} className="px-4 py-1.5 rounded-lg font-medium text-xs bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 transition-colors">Terminar Sessão</button>
-          </div>
-        </header>
-
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 text-slate-200 pb-24 md:pb-12 custom-scrollbar">
-          <div className="max-w-7xl mx-auto" key={activeTeam.id}>
-            {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
-            {activeTab === 'admin' && isAdmin && <AdminModule />}
-            {activeTab === 'players' && <PlayersModule />}
-            {activeTab === 'training_plan' && <TrainingPlannerModule plans={trainingPlans} onAddPlan={handleAddTrainingPlan} onUpdatePlan={handleUpdateTrainingPlan} />}
-            {activeTab === 'training' && <TrainingModule players={playersList} />}
-            {activeTab === 'match' && <MatchModule players={playersList} reports={matchReports} onAddReport={handleAddMatchReport} />}
-            {activeTab === 'future_scouting' && <FutureScoutingModule reports={futureReports} onAddReport={handleAddFutureReport} />}
-            {activeTab === 'tactics' && <TacticalBoard players={playersList} />}
-            {activeTab === 'stats' && <StatsModule players={playersList} reports={matchReports} />}
-            {activeTab === 'account' && <MyAccount />}
-          </div>
-        </main>
-
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0f1523]/95 backdrop-blur-lg border-t border-slate-800/60 z-50 px-2 py-2 flex justify-between items-center overflow-x-auto custom-scrollbar shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
-           {menuItems.map(item => (
-             <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`flex flex-col items-center justify-center min-w-[60px] p-2 rounded-xl transition-all duration-200 ${activeTab === item.id ? 'text-blue-400 bg-blue-600/10' : 'text-slate-500'}`}>
-               <span className={`text-xl mb-1 transition-transform ${activeTab === item.id ? 'scale-110' : 'scale-100'}`}>{item.icon}</span>
-               <span className="text-[9px] font-semibold tracking-wider uppercase truncate max-w-full">{item.label.split(' ')[0]}</span>
-             </button>
-           ))}
-        </nav>
+          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-lg shadow-md transition-colors text-sm mt-2">
+            {current ? 'Atualizar Dados' : 'Criar Acesso'}
+          </button>
+        </form>
       </div>
     </div>
   );

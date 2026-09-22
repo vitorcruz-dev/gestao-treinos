@@ -9,12 +9,11 @@ import PlayersModule from './PlayersModule';
 import TacticalBoard from './TacticalBoard';
 import StatsModule from './StatsModule';
 import FutureScoutingModule from './FutureScoutingModule';
-import MyAccount from './MyAccount'; // <-- NOVO MÓDULO IMPORTADO
+import MyAccount from './MyAccount'; 
 import Login from './Login';
 import TeamSelection from './TeamSelection';
 import { StaffMember, Player, MatchReport, FutureOpponentScouting, Team, TrainingPlan } from './types';
 
-// Adicionado 'account' aos tipos permitidos
 type TabType = 'dashboard' | 'training_plan' | 'training' | 'match' | 'future_scouting' | 'admin' | 'players' | 'tactics' | 'stats' | 'account';
 const TIMEOUT_MS = 15 * 60 * 1000; 
 
@@ -37,6 +36,9 @@ export default function App() {
     const savedUser = localStorage.getItem('scoutpro_user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
+
+  // ESTADO PARA BLOQUEAR ACESSO COM PASS PROVISÓRIA
+  const [pendingPasswordChangeUser, setPendingPasswordChangeUser] = useState<StaffMember | null>(null);
   
   const [loginError, setLoginError] = useState('');
   
@@ -114,7 +116,7 @@ export default function App() {
   }, [currentUser]);
 
   const handleLogout = useCallback(() => {
-    setCurrentUser(null); setActiveTeam(null);
+    setCurrentUser(null); setActiveTeam(null); setPendingPasswordChangeUser(null);
     localStorage.removeItem('scoutpro_user'); 
     localStorage.removeItem('scoutpro_last_activity');
     localStorage.removeItem('scoutpro_active_tab'); 
@@ -132,15 +134,82 @@ export default function App() {
     return () => { clearInterval(intervalId); events.forEach(event => window.removeEventListener(event, updateActivity)); };
   }, [currentUser, handleLogout, updateActivity]);
 
+  // LOGIN ATUALIZADO COM VERIFICAÇÃO DE PASS PROVISÓRIA
   const handleLogin = async (user: string, pass: string) => {
     const { data } = await supabase.from('staff').select('*').eq('username', user).eq('password', pass).single();
     if (data) { 
       const u = mapStaff(data);
-      setCurrentUser(u); setLoginError(''); setActiveTeam(null);
-      localStorage.setItem('scoutpro_user', JSON.stringify(u));
-      localStorage.setItem('scoutpro_last_activity', Date.now().toString());
+      if (data.must_change_password) {
+        setPendingPasswordChangeUser(u);
+        setLoginError('');
+      } else {
+        setCurrentUser(u); setLoginError(''); setActiveTeam(null);
+        localStorage.setItem('scoutpro_user', JSON.stringify(u));
+        localStorage.setItem('scoutpro_last_activity', Date.now().toString());
+      }
     } else setLoginError('Email ou palavra-passe incorretos.');
   };
+
+  const handleForcePasswordSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const p1 = fd.get('p1') as string;
+    const p2 = fd.get('p2') as string;
+
+    if (p1 !== p2) {
+      alert("As senhas não coincidem!");
+      return;
+    }
+    if (p1.length < 6) {
+      alert("A nova senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (pendingPasswordChangeUser) {
+      const { error } = await supabase.from('staff').update({ password: p1, must_change_password: false }).eq('id', pendingPasswordChangeUser.id);
+      if (!error) {
+        const u = { ...pendingPasswordChangeUser, password: p1 };
+        setCurrentUser(u);
+        setPendingPasswordChangeUser(null);
+        localStorage.setItem('scoutpro_user', JSON.stringify(u));
+        localStorage.setItem('scoutpro_last_activity', Date.now().toString());
+      } else {
+        alert("Erro ao alterar senha: " + error.message);
+      }
+    }
+  };
+
+  // ECRÃ OBRIGATÓRIO DE NOVA PASSWORD
+  if (pendingPasswordChangeUser) {
+    return (
+      <div className="flex h-screen bg-[#090e17] items-center justify-center p-4">
+        <div className="bg-[#151c2c] border border-slate-800/60 p-8 rounded-2xl w-full max-w-md shadow-2xl">
+          <div className="text-center mb-8">
+            <div className="bg-slate-800/50 w-16 h-16 rounded-2xl flex items-center justify-center border border-slate-700/50 shadow-sm mx-auto mb-4">
+              <span className="text-white font-bold text-xl">SP<span className="text-blue-500">.</span></span>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Bem-vindo(a), {pendingPasswordChangeUser.name.split(' ')[0]}</h2>
+            <p className="text-slate-400 text-sm">Por questões de segurança, tem de definir uma nova palavra-passe para o seu primeiro acesso.</p>
+          </div>
+          
+          <form onSubmit={handleForcePasswordSubmit} className="space-y-5">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Nova Palavra-Passe</label>
+              <input required type="password" name="p1" className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="Mínimo 6 caracteres" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Confirmar Palavra-Passe</label>
+              <input required type="password" name="p2" className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="Repita a palavra-passe" />
+            </div>
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-lg shadow-md transition-colors text-sm mt-4">
+              Guardar e Entrar
+            </button>
+          </form>
+          <button onClick={() => setPendingPasswordChangeUser(null)} className="w-full text-center text-slate-500 text-xs hover:text-slate-300 mt-6 transition-colors">Voltar ao Login</button>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUser) return <Login onLogin={handleLogin} error={loginError} />;
   const isAdmin = currentUser.role === 'Administrador';
@@ -199,7 +268,6 @@ export default function App() {
     { id: 'future_scouting', label: 'Adversários', icon: '🔭' },
     { id: 'tactics', label: 'Tática', icon: '📋' },
     { id: 'stats', label: 'Estatísticas', icon: '📈' },
-    // A "Minha Conta" agora faz parte do menu principal (útil também no telemóvel)
     { id: 'account', label: 'Minha Conta', icon: '👤' },
   ];
 
@@ -228,7 +296,6 @@ export default function App() {
         </nav>
 
         <div className="p-5 border-t border-slate-800/60 bg-[#0f1523]">
-          {/* Agora o cartão de perfil em baixo também é clicável e redireciona para a Conta! */}
           <div 
             onClick={() => setActiveTab('account')}
             className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600/50 transition-all"
@@ -282,8 +349,6 @@ export default function App() {
             {activeTab === 'future_scouting' && <FutureScoutingModule reports={futureReports} onAddReport={handleAddFutureReport} />}
             {activeTab === 'tactics' && <TacticalBoard players={playersList} />}
             {activeTab === 'stats' && <StatsModule players={playersList} reports={matchReports} />}
-            
-            {/* O NOVO MÓDULO */}
             {activeTab === 'account' && <MyAccount />}
           </div>
         </main>
