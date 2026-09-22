@@ -195,7 +195,7 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
         <canvas
           ref={canvasRef}
           width={800}
-          height={400} // Altura ajustada para caber melhor em formulários múltiplos
+          height={400}
           className="w-full h-auto cursor-crosshair"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -332,9 +332,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
             {plans.map(plan => {
               const planExercises = Array.isArray(plan.exercises) ? plan.exercises : [];
               const validCount = planExercises.filter((ex: any) => ex.title?.trim() || ex.description?.trim()).length;
-              // Verifica se algum exercício tem desenho para mostrar o emblema
               const hasDrawing = planExercises.some((ex: any) => !!ex.board_image);
-              // Pega na primeira imagem disponível para decorar o fundo do cartão
               const firstDrawing = planExercises.find((ex: any) => !!ex.board_image)?.board_image;
 
               return (
@@ -372,7 +370,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     );
   }
 
-  // VISTA 2: DETALHES E IMPRESSÃO (Agora com um quadro tático em CADA exercício impresso!)
+  // VISTA 2: DETALHES E IMPRESSÃO
   if (view === 'details' && current) {
     const currentExercises = Array.isArray(current.exercises) ? current.exercises : [];
     const validExercises = currentExercises.filter((ex: any) => (ex.title && ex.title.trim() !== '') || (ex.description && ex.description.trim() !== ''));
@@ -438,10 +436,10 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
                       </div>
                       <p className="text-sm text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed mb-4">{ex.description || 'Sem descrição.'}</p>
                       
-                      {/* APRESENTAÇÃO DO QUADRO TÁTICO ESPECÍFICO DESTE EXERCÍCIO */}
-                      {ex.board_image && (
+                      {/* CORREÇÃO AQUI: Cast para (ex as any).board_image evita o erro TS2339 */}
+                      {(ex as any).board_image && (
                         <div className="w-full flex justify-center bg-[#090e17] rounded-xl overflow-hidden border border-slate-700/50 print-border-black mt-2">
-                          <img src={ex.board_image} alt={`Tática ${idx + 1}`} className="max-h-[300px] w-full object-contain" />
+                          <img src={(ex as any).board_image} alt={`Tática ${idx + 1}`} className="max-h-[300px] w-full object-contain" />
                         </div>
                       )}
                     </div>
@@ -526,10 +524,8 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Descrição e Regras</label>
                     <textarea placeholder="Explique as dinâmicas do exercício..." value={ex.description || ''} onChange={(e) => updateExercise(index, 'description', e.target.value)} rows={3} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none custom-scrollbar leading-relaxed"></textarea>
                     
-                    {/* O QUADRO TÁTICO AGORA VIVE DENTRO DO EXERCÍCIO! */}
                     <div className="mt-5 border-t border-slate-800/60 pt-4">
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Esquema Tático (Exercício {index + 1})</label>
-                      {/* O KEY garante que cada canvas é independente */}
                       <TacticalCanvas key={ex.id} defaultImage={ex.board_image} onChange={(img) => updateExercise(index, 'board_image', img)} />
                     </div>
                   </div>
