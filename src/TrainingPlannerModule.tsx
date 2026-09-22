@@ -26,20 +26,20 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
     const w = canvas.width;
     const h = canvas.height;
 
-    // Fundo do Campo (Verde/Escuro)
+    // Fundo do Campo
     ctx.fillStyle = '#0f1523';
     ctx.fillRect(0, 0, w, h);
 
     // Linhas do Campo
     ctx.strokeStyle = 'rgba(255,255,255,0.2)';
     ctx.lineWidth = 2;
-    ctx.strokeRect(30, 30, w - 60, h - 60); // Linha Lateral
+    ctx.strokeRect(30, 30, w - 60, h - 60);
     ctx.beginPath();
     ctx.moveTo(w / 2, 30);
-    ctx.lineTo(w / 2, h - 30); // Meio Campo
+    ctx.lineTo(w / 2, h - 30);
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(w / 2, h / 2, 50, 0, Math.PI * 2); // Círculo Central
+    ctx.arc(w / 2, h / 2, 50, 0, Math.PI * 2);
     ctx.stroke();
     
     // Pequenas áreas
@@ -81,7 +81,7 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
   const handleUndo = () => {
     if (history.length > 1) {
       const newHistory = [...history];
-      newHistory.pop(); // remove o atual
+      newHistory.pop();
       const previous = newHistory[newHistory.length - 1];
       setHistory(newHistory);
       loadSnapshot(previous);
@@ -174,7 +174,7 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
   ];
 
   return (
-    <div className="w-full flex flex-col gap-3">
+    <div className="w-full flex flex-col gap-3 mt-2">
       <div className="flex flex-wrap gap-2 bg-[#090e17] p-3 rounded-xl border border-slate-700/80">
         {toolsList.map((t: any) => (
           <button
@@ -195,7 +195,7 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
         <canvas
           ref={canvasRef}
           width={800}
-          height={500}
+          height={400} // Altura ajustada para caber melhor em formulários múltiplos
           className="w-full h-auto cursor-crosshair"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -216,7 +216,6 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
   const [current, setCurrent] = useState<any | null>(null); 
   
   const [exercises, setExercises] = useState<any[]>([]);
-  const [boardImage, setBoardImage] = useState<string>(''); 
 
   const [modal, setModal] = useState<{
     show: boolean;
@@ -242,8 +241,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
       date: fd.get('date') as string,
       theme: fd.get('theme') as string,
       finalAppreciation: fd.get('finalAppreciation') as string,
-      exercises: exercises,
-      board_image: boardImage 
+      exercises: exercises, 
     };
 
     if (current) onUpdatePlan(planData);
@@ -270,7 +268,6 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
   const openForm = (plan: any | null = null) => {
     setCurrent(plan);
     setExercises(Array.isArray(plan?.exercises) ? plan.exercises : []);
-    setBoardImage(plan?.board_image || '');
     setView('form');
   };
 
@@ -279,7 +276,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     setView('details');
   };
 
-  const addExercise = () => setExercises([...exercises, { id: Date.now().toString(), title: '', duration: '', description: '' }]);
+  const addExercise = () => setExercises([...exercises, { id: Date.now().toString(), title: '', duration: '', description: '', board_image: '' }]);
   const updateExercise = (index: number, field: string, value: string) => {
     const newExercises = [...exercises];
     newExercises[index] = { ...newExercises[index], [field]: value };
@@ -335,14 +332,17 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
             {plans.map(plan => {
               const planExercises = Array.isArray(plan.exercises) ? plan.exercises : [];
               const validCount = planExercises.filter((ex: any) => ex.title?.trim() || ex.description?.trim()).length;
-              const hasDrawing = !!(plan as any).board_image;
+              // Verifica se algum exercício tem desenho para mostrar o emblema
+              const hasDrawing = planExercises.some((ex: any) => !!ex.board_image);
+              // Pega na primeira imagem disponível para decorar o fundo do cartão
+              const firstDrawing = planExercises.find((ex: any) => !!ex.board_image)?.board_image;
 
               return (
                 <div key={plan.id} className="bg-[#151c2c] p-5 rounded-xl border border-slate-800/60 hover:border-slate-700 transition-colors shadow-sm flex flex-col h-full relative overflow-hidden">
                   
-                  {hasDrawing && (
-                    <div className="absolute top-0 right-0 w-16 h-16 opacity-10 pointer-events-none">
-                      <img src={(plan as any).board_image} alt="Tática" className="w-full h-full object-cover rounded-bl-full" />
+                  {firstDrawing && (
+                    <div className="absolute top-0 right-0 w-20 h-20 opacity-10 pointer-events-none">
+                      <img src={firstDrawing} alt="Tática" className="w-full h-full object-cover rounded-bl-full" />
                     </div>
                   )}
 
@@ -372,7 +372,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     );
   }
 
-  // VISTA 2: DETALHES E IMPRESSÃO
+  // VISTA 2: DETALHES E IMPRESSÃO (Agora com um quadro tático em CADA exercício impresso!)
   if (view === 'details' && current) {
     const currentExercises = Array.isArray(current.exercises) ? current.exercises : [];
     const validExercises = currentExercises.filter((ex: any) => (ex.title && ex.title.trim() !== '') || (ex.description && ex.description.trim() !== ''));
@@ -423,33 +423,27 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
 
           <div className="p-8 space-y-8">
             
-            {/* O QUADRO TÁTICO NA IMPRESSÃO */}
-            {current.board_image && (
-              <div className="avoid-page-break mb-8">
-                <h3 className="text-sm font-bold text-slate-200 print-text-black mb-3 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
-                  Esquema Tático / Exercício
-                </h3>
-                <div className="w-full flex justify-center bg-[#090e17] rounded-xl overflow-hidden border border-slate-700/50 print-border-black">
-                  <img src={current.board_image} alt="Quadro Tático" className="max-h-[350px] w-full object-contain" />
-                </div>
-              </div>
-            )}
-
             {validExercises.length > 0 && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <h3 className="text-sm font-bold text-slate-200 print-text-black mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800/60 print-border-black pb-2">
                   <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
-                  Estrutura
+                  Estrutura e Exercícios
                 </h3>
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-8">
                   {validExercises.map((ex: any, idx: number) => (
-                    <div key={idx} className="avoid-page-break bg-[#0f1523]/50 print-bg-gray p-4 rounded-xl border border-slate-800/60 print-border-black">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="text-base font-bold text-white print-text-black">{idx + 1}. {ex.title || ex.name || 'Exercício'}</h4>
-                        {ex.duration && <span className="text-xs font-bold text-slate-400 print-text-gray bg-slate-800/50 print-bg-gray px-2 py-1 rounded">⏳ {ex.duration} min</span>}
+                    <div key={idx} className="avoid-page-break bg-[#0f1523]/50 print-bg-gray p-5 rounded-xl border border-slate-800/60 print-border-black">
+                      <div className="flex justify-between items-start mb-3">
+                        <h4 className="text-lg font-bold text-white print-text-black">{idx + 1}. {ex.title || ex.name || 'Exercício'}</h4>
+                        {ex.duration && <span className="text-xs font-bold text-slate-400 print-text-gray bg-slate-800/50 print-bg-gray px-3 py-1.5 rounded-lg">⏳ {ex.duration} min</span>}
                       </div>
-                      <p className="text-sm text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed">{ex.description || 'Sem descrição.'}</p>
+                      <p className="text-sm text-slate-300 print-text-gray whitespace-pre-wrap leading-relaxed mb-4">{ex.description || 'Sem descrição.'}</p>
+                      
+                      {/* APRESENTAÇÃO DO QUADRO TÁTICO ESPECÍFICO DESTE EXERCÍCIO */}
+                      {ex.board_image && (
+                        <div className="w-full flex justify-center bg-[#090e17] rounded-xl overflow-hidden border border-slate-700/50 print-border-black mt-2">
+                          <img src={ex.board_image} alt={`Tática ${idx + 1}`} className="max-h-[300px] w-full object-contain" />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -468,12 +462,10 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
               </div>
             )}
 
-            {!current.board_image && (
-              <div className="hidden print:block avoid-page-break mt-10">
-                 <h3 className="text-sm font-bold text-black mb-3 uppercase tracking-wider">Anotações Manuais</h3>
-                 <div className="border-2 border-dashed border-gray-400 h-64 rounded-xl w-full"></div>
-              </div>
-            )}
+            <div className="hidden print:block avoid-page-break mt-10">
+               <h3 className="text-sm font-bold text-black mb-3 uppercase tracking-wider">Anotações Manuais</h3>
+               <div className="border-2 border-dashed border-gray-400 h-64 rounded-xl w-full"></div>
+            </div>
 
           </div>
         </div>
@@ -481,7 +473,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
     );
   }
 
-  // VISTA 3: FORMULÁRIO COM DESENHO TÁTICO
+  // VISTA 3: FORMULÁRIO COM CONSTRUTOR
   return (
     <div className="p-2 md:p-6 max-w-4xl mx-auto">
       <div className="bg-[#151c2c] p-6 md:p-8 rounded-2xl border border-slate-800/60 shadow-lg">
@@ -502,38 +494,44 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
             </div>
           </div>
 
-          {/* NOVO: QUADRO TÁTICO */}
-          <div className="border-t border-slate-800/60 pt-6">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Quadro Tático (Desenhe o Exercício)</label>
-            <TacticalCanvas defaultImage={boardImage} onChange={(img) => setBoardImage(img)} />
-          </div>
-
           <div className="border-t border-slate-800/60 pt-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
               <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Construtor de Exercícios (Opcional)</label>
-              <button type="button" onClick={addExercise} className="bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg text-[11px] font-bold border border-blue-500/20 transition-colors w-full sm:w-auto">
+              <button type="button" onClick={addExercise} className="bg-blue-600 text-white hover:bg-blue-500 px-4 py-2 rounded-lg text-xs font-bold transition-colors w-full sm:w-auto shadow-md">
                 + Adicionar Exercício
               </button>
             </div>
 
             {exercises.length === 0 ? (
               <div className="text-center p-6 bg-[#0f1523] border border-dashed border-slate-700/80 rounded-xl">
-                <p className="text-sm text-slate-500">Nenhum exercício adicionado. Opcional.</p>
+                <p className="text-sm text-slate-500">Nenhum exercício adicionado. Clique no botão acima para adicionar um.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {exercises.map((ex: any, index: number) => (
-                  <div key={index} className="bg-[#0f1523] p-4 rounded-xl border border-slate-700/80 relative group">
-                    <button type="button" onClick={() => removeExercise(index)} className="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-sm font-bold transition-colors">✕</button>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3 pr-8">
+                  <div key={ex.id || index} className="bg-[#0f1523] p-5 rounded-xl border border-slate-700/80 relative group shadow-sm">
+                    <button type="button" onClick={() => removeExercise(index)} className="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-sm font-bold transition-colors bg-slate-800 hover:bg-red-500/10 w-8 h-8 rounded-full flex items-center justify-center">✕</button>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 pr-10">
                       <div className="md:col-span-3">
-                        <input type="text" placeholder={`Exercício ${index + 1}`} value={ex.title || ex.name || ''} onChange={(e) => updateExercise(index, 'title', e.target.value)} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none font-semibold" />
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Título do Exercício</label>
+                        <input type="text" placeholder={`Ex: Posse de Bola 5x5`} value={ex.title || ex.name || ''} onChange={(e) => updateExercise(index, 'title', e.target.value)} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none font-semibold" />
                       </div>
                       <div className="md:col-span-1">
-                        <input type="text" placeholder="Duração (min)" value={ex.duration || ''} onChange={(e) => updateExercise(index, 'duration', e.target.value)} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none text-center" />
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Duração</label>
+                        <input type="text" placeholder="min" value={ex.duration || ''} onChange={(e) => updateExercise(index, 'duration', e.target.value)} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none text-center" />
                       </div>
                     </div>
-                    <textarea placeholder="Descrição do exercício..." value={ex.description || ''} onChange={(e) => updateExercise(index, 'description', e.target.value)} rows={3} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none custom-scrollbar leading-relaxed"></textarea>
+                    
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Descrição e Regras</label>
+                    <textarea placeholder="Explique as dinâmicas do exercício..." value={ex.description || ''} onChange={(e) => updateExercise(index, 'description', e.target.value)} rows={3} className="w-full bg-[#151c2c] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none custom-scrollbar leading-relaxed"></textarea>
+                    
+                    {/* O QUADRO TÁTICO AGORA VIVE DENTRO DO EXERCÍCIO! */}
+                    <div className="mt-5 border-t border-slate-800/60 pt-4">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Esquema Tático (Exercício {index + 1})</label>
+                      {/* O KEY garante que cada canvas é independente */}
+                      <TacticalCanvas key={ex.id} defaultImage={ex.board_image} onChange={(img) => updateExercise(index, 'board_image', img)} />
+                    </div>
                   </div>
                 ))}
               </div>
