@@ -9,7 +9,7 @@ interface FutureScoutingModuleProps {
 }
 
 // ==========================================
-// COMPONENTE: QUADRO TÁTICO (Para Formação Adversária)
+// COMPONENTE: QUADRO TÁTICO
 // ==========================================
 const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onChange: (img: string) => void }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -147,7 +147,7 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
   };
 
   const toolsList = [
-    { id: 'draw', label: '✏️ Linhas / Lápis' },
+    { id: 'draw', label: '✏️ Linhas' },
     { id: 't1', label: '🔴 Adv.' },
     { id: 't2', label: '🔵 Nossa Equipa' },
   ];
@@ -177,10 +177,43 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
 export default function FutureScoutingModule({ reports }: FutureScoutingModuleProps) {
   const [view, setView] = useState<'list' | 'form' | 'details'>('list');
   const [current, setCurrent] = useState<FutureOpponentScouting | null>(null);
+  
+  // ESTADOS DAS IMAGENS
   const [boardImage, setBoardImage] = useState<string>('');
+  const [offCornerImg, setOffCornerImg] = useState<string>('');
+  const [defCornerImg, setDefCornerImg] = useState<string>('');
+  
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const activeTeam = JSON.parse(localStorage.getItem('scoutpro_active_team') || '{}');
+
+  // FUNÇÃO DE COMPRESSÃO E CARREGAMENTO DE IMAGEM
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, setImg: React.Dispatch<React.SetStateAction<string>>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Redimensionar imagem para poupar espaço na BD (Máximo 800px largura)
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Converte para JPEG com 80% de qualidade
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setImg(dataUrl);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -195,8 +228,8 @@ export default function FutureScoutingModule({ reports }: FutureScoutingModulePr
       defending_formation: fd.get('defendingFormation'),
       offensive_corners: fd.get('offensiveCorners'),
       defensive_corners: fd.get('defensiveCorners'),
-      offensive_corners_photo_url: fd.get('offensiveCornersPhotoUrl'),
-      defensive_corners_photo_url: fd.get('defensiveCornersPhotoUrl'),
+      offensive_corners_photo_url: offCornerImg, // Imagem galeria
+      defensive_corners_photo_url: defCornerImg, // Imagem galeria
       strengths: fd.get('strengths'),
       weaknesses: fd.get('weaknesses'),
       strong_players: fd.get('strongPlayers'),
@@ -228,10 +261,11 @@ export default function FutureScoutingModule({ reports }: FutureScoutingModulePr
   const openForm = (report: FutureOpponentScouting | null = null) => {
     setCurrent(report);
     setBoardImage(report?.formationBoardImage || '');
+    setOffCornerImg(report?.offensiveCornersPhotoUrl || '');
+    setDefCornerImg(report?.defensiveCornersPhotoUrl || '');
     setView('form');
   };
 
-  // GERADOR DE PDF DE ALTA QUALIDADE
   const handleDownloadPDF = async () => {
     const element = document.getElementById('pdf-content');
     if (!element) return;
@@ -242,7 +276,7 @@ export default function FutureScoutingModule({ reports }: FutureScoutingModulePr
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       
       const pdfWidth = 210; 
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width; // Altura gerada automaticamente sem cortes!
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width; 
       
       const pdf = new jsPDF('p', 'mm', [pdfWidth, pdfHeight]);
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
@@ -454,18 +488,48 @@ export default function FutureScoutingModule({ reports }: FutureScoutingModulePr
             <TacticalCanvas defaultImage={boardImage} onChange={setBoardImage} />
           </div>
 
+          {/* CANTOS COM UPLOAD DE FOTOS */}
           <div className="border-t border-slate-800/60 pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-slate-800/20 p-5 rounded-xl border border-slate-800/60">
+            <div className="bg-slate-800/20 p-5 rounded-xl border border-slate-800/60 flex flex-col">
               <h3 className="text-blue-400 font-bold mb-3 uppercase text-[10px] tracking-widest">Cantos Ofensivos</h3>
-              <textarea name="offensiveCorners" defaultValue={current?.offensiveCorners} rows={3} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none custom-scrollbar mb-3" placeholder="Para onde batem? Quantos na área?"></textarea>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Fotografia do Canto (URL Opcional)</label>
-              <input type="url" name="offensiveCornersPhotoUrl" defaultValue={current?.offensiveCornersPhotoUrl} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none" placeholder="https://..." />
+              <textarea name="offensiveCorners" defaultValue={current?.offensiveCorners} rows={3} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none custom-scrollbar mb-4" placeholder="Para onde batem? Quantos na área?"></textarea>
+              
+              <div className="mt-auto">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">📸 Fotografia do Canto (Galeria/PC)</label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => handleImageUpload(e, setOffCornerImg)} 
+                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 transition-all cursor-pointer" 
+                />
+                {offCornerImg && (
+                  <div className="mt-3 relative inline-block">
+                    <button type="button" onClick={() => setOffCornerImg('')} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md">✕</button>
+                    <img src={offCornerImg} alt="Preview" className="h-32 object-cover rounded border border-slate-700 shadow-sm" />
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="bg-slate-800/20 p-5 rounded-xl border border-slate-800/60">
+            
+            <div className="bg-slate-800/20 p-5 rounded-xl border border-slate-800/60 flex flex-col">
               <h3 className="text-blue-400 font-bold mb-3 uppercase text-[10px] tracking-widest">Cantos Defensivos</h3>
-              <textarea name="defensiveCorners" defaultValue={current?.defensiveCorners} rows={3} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none custom-scrollbar mb-3" placeholder="Tipo de marcação? Zona, HxH, mista?"></textarea>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Fotografia do Canto (URL Opcional)</label>
-              <input type="url" name="defensiveCornersPhotoUrl" defaultValue={current?.defensiveCornersPhotoUrl} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none" placeholder="https://..." />
+              <textarea name="defensiveCorners" defaultValue={current?.defensiveCorners} rows={3} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none custom-scrollbar mb-4" placeholder="Tipo de marcação? Zona, HxH, mista?"></textarea>
+              
+              <div className="mt-auto">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">📸 Fotografia do Canto (Galeria/PC)</label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => handleImageUpload(e, setDefCornerImg)} 
+                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 transition-all cursor-pointer" 
+                />
+                {defCornerImg && (
+                  <div className="mt-3 relative inline-block">
+                    <button type="button" onClick={() => setDefCornerImg('')} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md">✕</button>
+                    <img src={defCornerImg} alt="Preview" className="h-32 object-cover rounded border border-slate-700 shadow-sm" />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
