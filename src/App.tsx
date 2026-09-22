@@ -202,70 +202,75 @@ export default function App() {
   if (isAdmin) menuItems.splice(1, 0, { id: 'admin', label: 'Staff', icon: '👥' });
 
   return (
-    <div className="flex h-screen bg-[#0b1121] text-slate-200 font-sans overflow-hidden">
+    <div className="flex h-screen bg-[#090e17] text-slate-200 font-sans overflow-hidden">
       
-      <aside className="hidden md:flex w-72 bg-[#151c2c] border-r border-slate-800 flex-col z-20 shadow-2xl">
-        <div className="p-6 border-b border-slate-800">
-          <div className="flex items-center justify-between mb-4">
-            <div className="bg-black w-10 h-10 rounded-lg flex items-center justify-center shadow-lg border border-slate-800"><span className="text-white font-black text-sm">SP<span className="text-blue-500">.</span></span></div>
-            <button onClick={() => setActiveTeam(null)} className="text-[10px] uppercase font-bold text-slate-500 hover:text-white bg-slate-800 px-2 py-1 rounded">Trocar Equipa</button>
+      {/* SIDEBAR ELEGANTE */}
+      <aside className="hidden md:flex w-64 bg-[#0f1523] border-r border-slate-800/60 flex-col z-20 shadow-xl">
+        <div className="p-6 border-b border-slate-800/60">
+          <div className="flex items-center justify-between mb-5">
+            <div className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center border border-slate-700/50 shadow-sm"><span className="text-white font-bold text-[11px]">SP<span className="text-blue-500">.</span></span></div>
+            <button onClick={() => setActiveTeam(null)} className="text-[10px] uppercase font-semibold text-slate-500 hover:text-slate-300 transition-colors tracking-wider">Trocar Equipa</button>
           </div>
-          <h1 className="text-lg font-black text-white tracking-tight leading-tight">{activeTeam.club}</h1>
-          <p className="text-xs text-blue-400 mt-1 uppercase tracking-widest font-bold">{activeTeam.name} • {activeTeam.year}</p>
+          <h1 className="text-base font-semibold text-white tracking-tight leading-tight truncate">{activeTeam.club}</h1>
+          <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-medium">{activeTeam.name} • {activeTeam.year}</p>
         </div>
 
-        <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto custom-scrollbar">
-          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 px-3">Menu</div>
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto custom-scrollbar">
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 px-2">Menu Principal</div>
           {menuItems.map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-200 text-sm ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-              <span className="text-lg opacity-80">{item.icon}</span>{item.label}
+            <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 text-sm ${activeTab === item.id ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 border border-transparent'}`}>
+              <span className="text-base opacity-80">{item.icon}</span>{item.label}
             </button>
           ))}
         </nav>
 
-        <div className="p-6 border-t border-slate-800 bg-[#0f172a]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-inner">{currentUser.name.charAt(0)}</div>
+        <div className="p-5 border-t border-slate-800/60 bg-[#0f1523]">
+          <div className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30">
+            <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-sm">{currentUser.name.charAt(0)}</div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-bold text-white truncate">{currentUser.name}</p>
-              <p className="text-[11px] text-slate-400 truncate uppercase tracking-wider">{currentUser.role}</p>
+              <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
+              <p className="text-[9px] text-slate-400 truncate uppercase tracking-widest mt-0.5">{currentUser.role}</p>
             </div>
           </div>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="bg-[#151c2c] border-b border-slate-800 px-4 md:px-8 py-4 flex justify-between items-center z-10 shadow-md">
+        {/* CABEÇALHO LIMPO */}
+        <header className="bg-[#0f1523]/80 backdrop-blur-md border-b border-slate-800/60 px-4 md:px-8 py-3.5 flex justify-between items-center z-10 sticky top-0">
           
+          {/* LADO ESQUERDO MOBILE */}
           <div className="flex items-center gap-3 md:hidden">
              {activeTab !== 'dashboard' && (
-               <button onClick={handleGoBack} className="bg-slate-800 w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 border border-slate-700 active:bg-slate-700">
-                 <span className="font-bold text-lg leading-none mb-1">←</span>
+               <button onClick={handleGoBack} className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 border border-slate-700/50 active:bg-slate-700 transition-colors">
+                 <span className="font-medium text-base leading-none mb-0.5">←</span>
                </button>
              )}
-             <div className="bg-black w-8 h-8 rounded-lg flex items-center justify-center border border-slate-800"><span className="text-white font-black text-xs">SP<span className="text-blue-500">.</span></span></div>
-             <div className="flex flex-col"><h1 className="text-sm font-black text-white leading-none">{activeTeam.club}</h1><span className="text-[9px] text-slate-400">{activeTeam.year}</span></div>
+             <div className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center border border-slate-700/50"><span className="text-white font-bold text-[10px]">SP<span className="text-blue-500">.</span></span></div>
+             <div className="flex flex-col"><h1 className="text-xs font-semibold text-white leading-none truncate max-w-[120px]">{activeTeam.club}</h1><span className="text-[8px] text-slate-400 uppercase tracking-widest mt-0.5">{activeTeam.year}</span></div>
           </div>
           
+          {/* LADO ESQUERDO DESKTOP */}
           <div className="hidden md:flex items-center gap-4">
              {activeTab !== 'dashboard' && (
-               <button onClick={handleGoBack} className="bg-slate-800 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 border border-slate-700 hover:text-white hover:bg-slate-700 transition-colors" title="Voltar atrás">
-                 <span className="font-bold text-lg leading-none mb-1">←</span>
+               <button onClick={handleGoBack} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700" title="Voltar atrás">
+                 <span className="font-medium text-lg leading-none mb-0.5">←</span>
                </button>
              )}
-            <h2 className="text-xl font-bold text-white">{menuItems.find(m => m.id === activeTab)?.label}</h2>
+            <h2 className="text-lg font-semibold text-white tracking-wide">{menuItems.find(m => m.id === activeTab)?.label}</h2>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button onClick={() => setActiveTeam(null)} className="md:hidden px-3 py-2 rounded-lg font-bold text-xs bg-slate-800 text-slate-300 border border-slate-700">Trocar</button>
-            <button onClick={handleLogout} className="px-4 py-2 rounded-lg font-bold text-xs md:text-sm bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 transition-colors">Sair</button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setActiveTeam(null)} className="md:hidden px-3 py-1.5 rounded-lg font-medium text-[10px] uppercase tracking-wider bg-slate-800/50 text-slate-300 border border-slate-700/50">Trocar</button>
+            <button onClick={handleLogout} className="px-4 py-1.5 rounded-lg font-medium text-xs bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 transition-colors">Terminar Sessão</button>
           </div>
         </header>
 
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 text-slate-900 pb-24 md:pb-12 custom-scrollbar">
+        {/* ÁREA PRINCIPAL */}
+        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 text-slate-200 pb-24 md:pb-12 custom-scrollbar">
           <div className="max-w-7xl mx-auto" key={activeTeam.id}>
             {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
-            {activeTab === 'admin' && isAdmin && <AdminModule />} {/* <-- CORREÇÃO FEITA AQUI */}
+            {activeTab === 'admin' && isAdmin && <AdminModule />}
             {activeTab === 'players' && <PlayersModule />}
             {activeTab === 'training_plan' && <TrainingPlannerModule plans={trainingPlans} onAddPlan={handleAddTrainingPlan} onUpdatePlan={handleUpdateTrainingPlan} />}
             {activeTab === 'training' && <TrainingModule players={playersList} />}
@@ -276,10 +281,12 @@ export default function App() {
           </div>
         </main>
 
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#151c2c] border-t border-slate-800 z-50 px-2 py-2 flex justify-between items-center overflow-x-auto custom-scrollbar shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        {/* NAVBAR MOBILE REDESENHADA */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0f1523]/95 backdrop-blur-lg border-t border-slate-800/60 z-50 px-2 py-2 flex justify-between items-center overflow-x-auto custom-scrollbar shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
            {menuItems.map(item => (
-             <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`flex flex-col items-center justify-center min-w-[55px] p-2 rounded-xl transition-all ${activeTab === item.id ? 'text-blue-500 bg-blue-500/10' : 'text-slate-400'}`}>
-               <span className="text-xl mb-1">{item.icon}</span><span className="text-[9px] font-bold tracking-wider uppercase truncate max-w-full">{item.label.split(' ')[0]}</span>
+             <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`flex flex-col items-center justify-center min-w-[60px] p-2 rounded-xl transition-all duration-200 ${activeTab === item.id ? 'text-blue-400 bg-blue-600/10' : 'text-slate-500'}`}>
+               <span className={`text-xl mb-1 transition-transform ${activeTab === item.id ? 'scale-110' : 'scale-100'}`}>{item.icon}</span>
+               <span className="text-[9px] font-semibold tracking-wider uppercase truncate max-w-full">{item.label.split(' ')[0]}</span>
              </button>
            ))}
         </nav>
