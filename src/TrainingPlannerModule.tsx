@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { TrainingPlan, CanvasItem } from './types';
-import ExerciseCanvas from './ExerciseCanvas';
+import { TrainingPlan } from './types';
 
 interface TrainingPlannerProps {
   plans: TrainingPlan[];
@@ -9,220 +8,253 @@ interface TrainingPlannerProps {
 }
 
 export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }: TrainingPlannerProps) {
-  const [view, setView] = useState<'form' | 'list' | 'report'>('form');
-  const [selectedPlanId, setSelectedPlanId] = useState<string>('');
-  
-  // Estado para sabermos se estamos a editar um plano existente ou a criar um novo
-  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [view, setView] = useState<'list' | 'form' | 'details'>('list');
+  const [current, setCurrent] = useState<TrainingPlan | null>(null);
 
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [theme, setTheme] = useState('');
-  
-  const [ex1, setEx1] = useState({ title: 'Aquecimento', duration: '', description: '', items: [] as CanvasItem[] });
-  const [ex2, setEx2] = useState({ title: 'Exercício 2', duration: '', description: '', items: [] as CanvasItem[] });
-  const [ex3, setEx3] = useState({ title: 'Exercício 3', duration: '', description: '', items: [] as CanvasItem[] });
-  const [ex4, setEx4] = useState({ title: 'Exercício 4', duration: '', description: '', items: [] as CanvasItem[] });
-  const [ex5, setEx5] = useState({ title: 'Retorno à Calma', duration: '', description: '', items: [] as CanvasItem[] });
-  const [appreciation, setAppreciation] = useState('');
+  const activeTeam = JSON.parse(localStorage.getItem('scoutpro_active_team') || '{}');
 
-  // Limpa o formulário para criar um treino do zero
-  const startNewPlan = () => {
-    setEditingPlanId(null);
-    setDate(new Date().toISOString().split('T')[0]); setTheme(''); setAppreciation('');
-    setEx1({ title: 'Aquecimento', duration: '', description: '', items: [] });
-    setEx2({ title: 'Exercício 2', duration: '', description: '', items: [] });
-    setEx3({ title: 'Exercício 3', duration: '', description: '', items: [] });
-    setEx4({ title: 'Exercício 4', duration: '', description: '', items: [] });
-    setEx5({ title: 'Retorno à Calma', duration: '', description: '', items: [] });
-    setView('form');
-  };
-
-  // Carrega um treino guardado para o formulário
-  const startEditing = (plan: TrainingPlan) => {
-    setEditingPlanId(plan.id);
-    setDate(plan.date);
-    setTheme(plan.theme);
-    setEx1({ title: plan.exercises[0].title, duration: plan.exercises[0].duration.toString(), description: plan.exercises[0].description, items: plan.exercises[0].canvasItems });
-    setEx2({ title: plan.exercises[1].title, duration: plan.exercises[1].duration.toString(), description: plan.exercises[1].description, items: plan.exercises[1].canvasItems });
-    setEx3({ title: plan.exercises[2].title, duration: plan.exercises[2].duration.toString(), description: plan.exercises[2].description, items: plan.exercises[2].canvasItems });
-    setEx4({ title: plan.exercises[3].title, duration: plan.exercises[3].duration.toString(), description: plan.exercises[3].description, items: plan.exercises[3].canvasItems });
-    setEx5({ title: plan.exercises[4].title, duration: plan.exercises[4].duration.toString(), description: plan.exercises[4].description, items: plan.exercises[4].canvasItems });
-    setAppreciation(plan.finalAppreciation);
-    setView('form');
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const planData: TrainingPlan = {
-      id: editingPlanId || Date.now().toString(),
-      teamId: '', // O App.tsx preenche
-      date, theme,
-      exercises: [
-        { title: ex1.title, duration: Number(ex1.duration), description: ex1.description, canvasItems: ex1.items },
-        { title: ex2.title, duration: Number(ex2.duration), description: ex2.description, canvasItems: ex2.items },
-        { title: ex3.title, duration: Number(ex3.duration), description: ex3.description, canvasItems: ex3.items },
-        { title: ex4.title, duration: Number(ex4.duration), description: ex4.description, canvasItems: ex4.items },
-        { title: ex5.title, duration: Number(ex5.duration), description: ex5.description, canvasItems: ex5.items },
-      ],
-      finalAppreciation: appreciation
+    const fd = new FormData(e.currentTarget);
+    
+    const planData = {
+      id: current?.id || Date.now().toString(),
+      teamId: activeTeam.id,
+      date: fd.get('date') as string,
+      theme: fd.get('theme') as string,
+      exercises: fd.get('exercises') as string,
+      finalAppreciation: fd.get('finalAppreciation') as string,
     };
 
-    if (editingPlanId) {
+    if (current) {
       onUpdatePlan(planData);
-      alert('Plano atualizado com sucesso!');
     } else {
       onAddPlan(planData);
-      alert('Plano guardado com sucesso!');
     }
     setView('list');
   };
 
-  const selectedPlan = plans.find(p => p.id === selectedPlanId);
+  const openForm = (plan: TrainingPlan | null = null) => {
+    setCurrent(plan);
+    setView('form');
+  };
 
-  const renderExerciseForm = (ex: any, setEx: any, isFixed: boolean) => (
-    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-6 break-inside-avoid">
-      <div className="flex flex-col md:flex-row gap-4 mb-4">
-        <div className="flex-1">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Fase do Treino</label>
-          <input type="text" value={ex.title} onChange={e => setEx({...ex, title: e.target.value})} readOnly={isFixed} className={`w-full p-3 rounded-lg font-bold ${isFixed ? 'bg-slate-200 text-slate-600' : 'bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none'}`} />
-        </div>
-        <div className="w-full md:w-32">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Duração (Min)</label>
-          <input type="number" required value={ex.duration} onChange={e => setEx({...ex, duration: e.target.value})} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: 15" />
-        </div>
-      </div>
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="flex-1">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Descrição / Regras</label>
-          <textarea required value={ex.description} onChange={e => setEx({...ex, description: e.target.value})} rows={10} className="w-full h-full min-h-[200px] p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none" placeholder="Descreva o exercício, objetivos e regras..."></textarea>
-        </div>
-        <div className="w-full lg:w-2/3">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Esquema Gráfico</label>
-          <ExerciseCanvas initialItems={ex.items} onChange={items => setEx({...ex, items})} />
-        </div>
-      </div>
-    </div>
-  );
+  const openDetails = (plan: TrainingPlan) => {
+    setCurrent(plan);
+    setView('details');
+  };
 
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 text-slate-900 relative">
-      <style>{`
-        @media print { 
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          body * { visibility: hidden; } 
-          #plan-pdf, #plan-pdf * { visibility: visible; } 
-          #plan-pdf { position: absolute; left: 0; top: 0; width: 100%; padding: 0; } 
-          .no-print { display: none !important; } 
-          .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; } 
-        }
-      `}</style>
-      
-      <div className="p-4 md:p-6 border-b border-slate-100 no-print flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50 rounded-t-2xl">
-        <div>
-          <h2 className="text-2xl font-black text-slate-900">Planeamento de Treino</h2>
+  // VISTA 1: LISTA DE TREINOS
+  if (view === 'list') {
+    return (
+      <div className="p-2 md:p-6 max-w-5xl mx-auto relative">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-slate-800/60 pb-6">
+          <div className="text-left">
+            <h2 className="text-2xl font-semibold text-white tracking-tight mb-1">Planear Treino</h2>
+            <p className="text-sm text-slate-400 font-medium">Gira as sessões de treino, exercícios e objetivos.</p>
+          </div>
+          <button onClick={() => openForm()} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 shadow-lg shadow-blue-900/20 transition-all flex gap-2 items-center w-full md:w-auto justify-center">
+            <span>+</span> Nova Sessão
+          </button>
         </div>
-        <div className="flex space-x-2 bg-slate-200 p-1 rounded-lg">
-          <button onClick={startNewPlan} className={`px-4 py-2 rounded-md font-bold text-sm transition-all ${view === 'form' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Criar Plano</button>
-          <button onClick={() => setView('list')} className={`px-4 py-2 rounded-md font-bold text-sm transition-all ${(view === 'list' || view === 'report') ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Histórico & PDF</button>
-        </div>
-      </div>
 
-      <div className="p-4 md:p-6">
-        {view === 'form' && (
-          /* O uso da propriedade "key" força o React a recriar o formulário quando editamos um treino diferente, atualizando as peças do campo! */
-          <form key={editingPlanId || 'new'} onSubmit={handleSubmit} className="no-print animate-fade-in">
-            {editingPlanId && (
-              <div className="mb-6 bg-blue-100 border border-blue-300 text-blue-800 p-3 rounded-lg font-bold flex items-center justify-between">
-                <span>✏️ Está a editar um plano guardado.</span>
-                <button type="button" onClick={startNewPlan} className="text-blue-600 hover:underline text-sm">Cancelar edição</button>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              <div><label className="font-bold text-sm text-slate-700">Data do Treino</label><input type="date" required value={date} onChange={e => setDate(e.target.value)} className="w-full mt-1 p-3 border border-slate-300 rounded-xl bg-slate-50 outline-none focus:border-blue-500" /></div>
-              <div><label className="font-bold text-sm text-slate-700">Tema / Foco Principal</label><input type="text" required value={theme} onChange={e => setTheme(e.target.value)} placeholder="Ex: Transição Ofensiva" className="w-full mt-1 p-3 border border-slate-300 rounded-xl bg-slate-50 outline-none focus:border-blue-500" /></div>
-            </div>
-
-            {renderExerciseForm(ex1, setEx1, true)}
-            {renderExerciseForm(ex2, setEx2, false)}
-            {renderExerciseForm(ex3, setEx3, false)}
-            {renderExerciseForm(ex4, setEx4, false)}
-            {renderExerciseForm(ex5, setEx5, true)}
-
-            <div className="bg-slate-800 p-5 rounded-xl border border-slate-900 mb-6 text-white">
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Apreciação / Expectativa do Treino</label>
-              <textarea required value={appreciation} onChange={e => setAppreciation(e.target.value)} rows={3} className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-white resize-none outline-none focus:border-blue-500" placeholder="Considerações finais sobre o plano..."></textarea>
-            </div>
-            
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black text-lg hover:bg-blue-700 transition-colors shadow-lg">
-              {editingPlanId ? 'Atualizar Plano de Treino' : 'Guardar Novo Plano'}
-            </button>
-          </form>
-        )}
-
-        {view === 'list' && (
-          <div className="space-y-4 no-print">
-            {plans.length === 0 ? <p className="text-slate-500 italic bg-slate-50 p-4 border rounded-xl">Nenhum plano registado.</p> : plans.map(p => (
-              <div key={p.id} className="bg-white border border-slate-200 p-5 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm hover:shadow-md transition-all">
-                <div>
-                  <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold mb-2 inline-block">{p.date}</span>
-                  <strong className="text-lg text-slate-900 block">{p.theme}</strong>
+        {plans.length === 0 ? (
+          <div className="bg-[#0f1523] p-12 rounded-2xl border border-slate-800/60 text-center">
+            <span className="text-4xl mb-4 block opacity-50">📝</span>
+            <h3 className="text-white font-semibold text-lg">Nenhum treino planeado</h3>
+            <p className="text-sm text-slate-400 mt-2">Crie a sua primeira sessão de treino.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {plans.map(plan => (
+              <div key={plan.id} className="bg-[#151c2c] p-5 rounded-xl border border-slate-800/60 hover:border-slate-700 transition-colors shadow-sm flex flex-col h-full">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="bg-slate-800/80 px-3 py-1 rounded-md text-xs font-bold text-blue-400 uppercase tracking-widest border border-slate-700">
+                    {new Date(plan.date).toLocaleDateString('pt-PT')}
+                  </div>
                 </div>
-                <div className="flex gap-2 w-full md:w-auto">
-                  <button onClick={() => startEditing(p)} className="flex-1 md:flex-none bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-slate-100 transition-colors">✏️ Editar</button>
-                  <button onClick={() => { setSelectedPlanId(p.id); setView('report'); }} className="flex-1 md:flex-none bg-slate-800 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-slate-700 transition-colors">Ver PDF</button>
+                
+                <h3 className="text-lg font-semibold text-white mb-2 leading-snug">{plan.theme}</h3>
+                
+                <p className="text-sm text-slate-400 line-clamp-3 mb-6 flex-1">
+                  {plan.exercises || 'Sem exercícios detalhados.'}
+                </p>
+
+                <div className="grid grid-cols-2 gap-2 mt-auto">
+                  <button onClick={() => openDetails(plan)} className="py-2 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-slate-700/50">
+                    Ver e Imprimir
+                  </button>
+                  <button onClick={() => openForm(plan)} className="py-2 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-medium border border-blue-500/20 transition-colors">
+                    Editar
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
+      </div>
+    );
+  }
 
-        {view === 'report' && selectedPlan && (
-          <div>
-            <div className="no-print mb-6 border-b border-slate-200 pb-4 flex flex-wrap gap-4 justify-between items-center">
-              <button onClick={() => setView('list')} className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold hover:bg-slate-300 transition-colors">&larr; Voltar</button>
-              <div className="flex gap-2">
-                <button onClick={() => startEditing(selectedPlan)} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg font-bold shadow-sm hover:bg-slate-100 transition-colors">✏️ Editar Plano</button>
-                <button onClick={() => window.print()} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center gap-2">🖨️ Imprimir Plano (PDF)</button>
+  // VISTA 2: DETALHES E IMPRESSÃO (Folha A4)
+  if (view === 'details' && current) {
+    return (
+      <div className="p-2 md:p-6 max-w-4xl mx-auto">
+        
+        {/* CSS INJETADO APENAS PARA A IMPRESSÃO */}
+        <style>
+          {`
+            @media print {
+              @page { size: A4 portrait; margin: 15mm; }
+              
+              /* Esconde toda a plataforma exceto o container de impressão */
+              body * { visibility: hidden; }
+              .printable-a4, .printable-a4 * { visibility: visible; }
+              
+              /* Reinicia os layouts que estragam o A4 */
+              html, body, #root, main { 
+                background: white !important; 
+                color: black !important; 
+                height: auto !important; 
+                overflow: visible !important;
+                display: block !important;
+              }
+              
+              /* Coloca o container no topo da folha */
+              .printable-a4 {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white !important;
+                color: black !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+              }
+              
+              /* Força as cores da folha de treino para tons escuros de impressão */
+              .print-text-black { color: #000 !important; }
+              .print-text-gray { color: #444 !important; }
+              .print-border-black { border-color: #000 !important; }
+              .print-bg-gray { background-color: #f3f4f6 !important; }
+              
+              /* Previne cortes a meio dos exercícios */
+              .avoid-page-break { page-break-inside: avoid; break-inside: avoid; }
+              
+              /* Esconde botões */
+              .no-print { display: none !important; }
+            }
+          `}
+        </style>
+
+        <div className="flex justify-between items-center mb-6 no-print">
+          <button onClick={() => setView('list')} className="text-slate-400 text-sm font-medium hover:text-white transition-colors">
+            ← Voltar
+          </button>
+          <button onClick={() => window.print()} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 shadow-md transition-all flex gap-2 items-center">
+            🖨️ Imprimir Folha A4
+          </button>
+        </div>
+        
+        {/* A FOLHA A4 */}
+        <div className="printable-a4 bg-[#151c2c] rounded-2xl border border-slate-800/60 shadow-xl overflow-hidden min-h-[297mm]">
+          
+          {/* Cabeçalho */}
+          <div className="p-8 md:p-10 border-b border-slate-800/60 print-border-black print-bg-gray">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-white print-text-black uppercase tracking-tight">Ficha de Treino</h1>
+                <p className="text-sm text-slate-400 print-text-gray font-medium mt-1">{activeTeam.club} • {activeTeam.year}</p>
+              </div>
+              <div className="text-right">
+                <span className="block text-[10px] text-slate-500 print-text-gray uppercase tracking-widest font-bold mb-1">Data da Sessão</span>
+                <span className="text-lg font-bold text-blue-400 print-text-black">{new Date(current.date).toLocaleDateString('pt-PT')}</span>
               </div>
             </div>
             
-            <div id="plan-pdf" className="bg-white">
-              <div className="border-b-2 border-slate-800 pb-4 mb-6">
-                <p className="text-slate-500 uppercase tracking-widest font-bold text-xs mb-1">ScoutPro - Departamento Técnico</p>
-                <h1 className="text-4xl font-black text-slate-900 uppercase">Plano de Treino</h1>
-                <div className="flex justify-between items-end mt-4">
-                  <p className="text-xl font-bold text-slate-700">Tema: <span className="text-blue-700">{selectedPlan.theme}</span></p>
-                  <p className="text-slate-500 font-bold bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{selectedPlan.date}</p>
-                </div>
-              </div>
-
-              <div className="space-y-8">
-                {selectedPlan.exercises.map((ex, i) => (
-                  <div key={i} className="break-inside-avoid border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                    <div className="bg-slate-800 text-white p-3 flex justify-between items-center print-bg">
-                      <h3 className="font-black uppercase tracking-wider">{ex.title}</h3>
-                      <span className="font-bold bg-slate-600 px-3 py-1 rounded-lg text-sm">{ex.duration} Min</span>
-                    </div>
-                    <div className="flex flex-col md:flex-row p-4 gap-6 bg-slate-50 print-bg">
-                      <div className="flex-1 whitespace-pre-wrap text-sm text-slate-700 leading-relaxed font-medium">
-                        {ex.description}
-                      </div>
-                      <div className="w-full md:w-1/2 shrink-0">
-                        <ExerciseCanvas initialItems={ex.canvasItems} readOnly={true} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-8 p-5 bg-blue-50 border border-blue-200 rounded-xl break-inside-avoid print-bg">
-                <h3 className="font-black text-blue-900 uppercase mb-2">Apreciação Final / Notas</h3>
-                <p className="text-sm text-slate-700 italic">{selectedPlan.finalAppreciation}</p>
-              </div>
+            <div className="bg-[#0f1523] print-bg-gray p-4 rounded-xl border border-slate-700/50 print-border-black">
+              <span className="block text-[10px] text-slate-500 print-text-gray uppercase tracking-widest font-bold mb-1">Tema Principal</span>
+              <h2 className="text-lg font-semibold text-slate-100 print-text-black">{current.theme}</h2>
             </div>
           </div>
-        )}
+
+          {/* Corpo do Treino */}
+          <div className="p-8 md:p-10 space-y-8">
+            
+            <div className="avoid-page-break">
+              <h3 className="text-sm font-bold text-slate-200 print-text-black mb-4 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
+                Descrição dos Exercícios
+              </h3>
+              <div className="bg-[#0f1523]/50 print-bg-gray p-6 rounded-xl border border-slate-800/60 print-border-black min-h-[150px]">
+                <p className="text-sm text-slate-300 print-text-black whitespace-pre-wrap leading-relaxed">
+                  {current.exercises || 'Nenhum detalhe inserido.'}
+                </p>
+              </div>
+            </div>
+
+            {current.finalAppreciation && (
+              <div className="avoid-page-break">
+                <h3 className="text-sm font-bold text-slate-200 print-text-black mb-4 uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 print-bg-gray"></span>
+                  Observações Finais
+                </h3>
+                <div className="bg-[#0f1523]/50 print-bg-gray p-6 rounded-xl border border-slate-800/60 print-border-black">
+                  <p className="text-sm text-slate-300 print-text-black whitespace-pre-wrap leading-relaxed">
+                    {current.finalAppreciation}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Espaço para desenho tático / notas manuais na impressão */}
+            <div className="hidden print:block avoid-page-break mt-10">
+               <h3 className="text-sm font-bold text-black mb-4 uppercase tracking-wider">Esquema Tático / Anotações Manuais</h3>
+               <div className="border-2 border-dashed border-gray-400 h-64 rounded-xl w-full"></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // VISTA 3: FORMULÁRIO (CRIAR / EDITAR)
+  return (
+    <div className="p-2 md:p-6 max-w-3xl mx-auto">
+      <div className="bg-[#151c2c] p-6 md:p-8 rounded-2xl border border-slate-800/60 shadow-lg">
+        <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800/60">
+          <h2 className="text-xl font-semibold text-white">{current ? 'Editar Sessão' : 'Planear Nova Sessão'}</h2>
+          <button onClick={() => setView('list')} className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancelar</button>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="md:col-span-1">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Data do Treino *</label>
+              <input required type="date" name="date" defaultValue={current?.date} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Tema Principal *</label>
+              <input required type="text" name="theme" defaultValue={current?.theme} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all" placeholder="Ex: Organização Defensiva e Transição Rápida" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Exercícios e Estrutura</label>
+            <textarea name="exercises" defaultValue={current?.exercises} rows={8} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all custom-scrollbar leading-relaxed" placeholder="Descreva o aquecimento, parte principal e finalização..."></textarea>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Foco / Observações da Equipa Técnica</label>
+            <textarea name="finalAppreciation" defaultValue={current?.finalAppreciation} rows={3} className="w-full bg-[#0f1523] border border-slate-700/80 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none transition-all custom-scrollbar leading-relaxed" placeholder="Atletas em gestão de esforço, dinâmicas a avaliar..."></textarea>
+          </div>
+
+          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-lg shadow-md transition-colors text-sm mt-2">
+            {current ? 'Guardar Alterações' : 'Criar Sessão de Treino'}
+          </button>
+        </form>
       </div>
     </div>
   );
