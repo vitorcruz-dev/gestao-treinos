@@ -21,13 +21,13 @@ interface PlayerExtended {
   weight_history: WeightRecord[];
 }
 
-export default function PlayersModule(props: any) {
+// A CULPADA ESTAVA AQUI! Agora estão só os parênteses vazios.
+export default function PlayersModule() {
   const [extPlayers, setExtPlayers] = useState<PlayerExtended[]>([]);
   const [view, setView] = useState<'grid' | 'form' | 'details'>('grid');
   const [current, setCurrent] = useState<PlayerExtended | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Vai buscar a equipa ativa à memória
   const activeTeam = JSON.parse(localStorage.getItem('scoutpro_active_team') || '{}');
 
   const fetchPlayers = async () => {
@@ -85,7 +85,6 @@ export default function PlayersModule(props: any) {
         await supabase.from('players').insert([payload]);
       }
       
-      // Sincronização invisível
       window.location.reload();
     } catch (err: any) {
       alert("Erro ao guardar: " + err.message);
