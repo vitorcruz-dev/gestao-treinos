@@ -27,7 +27,6 @@ export default function PlayersModule() {
   const [current, setCurrent] = useState<PlayerExtended | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ESTADO DO MODAL PERSONALIZADO (Fim dos popups feios do browser!)
   const [modal, setModal] = useState<{
     show: boolean;
     title: string;
@@ -61,7 +60,6 @@ export default function PlayersModule() {
     fetchPlayers();
   }, [activeTeam.id]);
 
-  // Controladores do Modal
   const openAlert = (title: string, message: string) => setModal({ show: true, title, message, onConfirm: null, type: 'alert' });
   const openConfirm = (title: string, message: string, onConfirm: () => void) => setModal({ show: true, title, message, onConfirm, type: 'confirm' });
   const closeModal = () => setModal(prev => ({ ...prev, show: false }));
@@ -128,7 +126,6 @@ export default function PlayersModule() {
     setView('details');
   };
 
-  // COMPONENTE DO MODAL
   const renderModal = () => {
     if (!modal.show) return null;
     return (
@@ -152,13 +149,11 @@ export default function PlayersModule() {
     );
   };
 
-  // VISTA EM LISTA (PLANTEL)
   if (view === 'grid') {
     return (
       <div className="p-2 md:p-6 max-w-6xl mx-auto relative">
         {renderModal()}
 
-        {/* CABEÇALHO (Agora alinhado à esquerda e mais elegante) */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-slate-800/60 pb-6">
           <div className="text-left">
             <h2 className="text-2xl font-semibold text-white tracking-tight mb-1">Plantel</h2>
@@ -182,7 +177,6 @@ export default function PlayersModule() {
             {extPlayers.map(player => (
               <div key={player.id} className="bg-[#151c2c] p-4 rounded-xl border border-slate-800/60 flex flex-col md:flex-row items-center gap-5 hover:border-slate-700 transition-colors shadow-sm group">
                 
-                {/* Avatar */}
                 <div className="shrink-0 relative">
                   {player.photo_url ? (
                     <img src={player.photo_url} alt={player.name} className="w-12 h-12 rounded-full object-cover border border-slate-700 shadow-sm" />
@@ -193,13 +187,12 @@ export default function PlayersModule() {
                   )}
                 </div>
 
-                {/* Info (Nome, Posição) - Agora com espaço livre para não cortar os nomes */}
-                <div className="flex-1 min-w-0 text-center md:text-left w-full">
-                  <h3 className="text-base font-semibold text-slate-100 truncate" title={player.name}>{player.name}</h3>
-                  <span className="text-[10px] font-bold text-blue-400/90 uppercase tracking-widest mt-0.5 block truncate" title={player.position}>{player.position}</span>
+                {/* CORREÇÃO AQUI: Retirado o 'truncate' para o nome ficar sempre visível */}
+                <div className="flex-1 w-full text-center md:text-left">
+                  <h3 className="text-base font-semibold text-slate-100 leading-snug">{player.name}</h3>
+                  <span className="text-[10px] font-bold text-blue-400/90 uppercase tracking-widest mt-0.5 block">{player.position}</span>
                 </div>
                 
-                {/* Atributos do Jogador - Separadores mais subtis e alinhamento elegante */}
                 <div className="flex items-center justify-center md:justify-end gap-4 w-full md:w-auto shrink-0 mt-3 md:mt-0">
                   <div className="text-center w-12">
                     <span className="block text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Idade</span>
@@ -217,7 +210,6 @@ export default function PlayersModule() {
                   </div>
                 </div>
 
-                {/* Ações - Botões Minimalistas */}
                 <div className="flex gap-2 w-full md:w-auto shrink-0 justify-center mt-4 md:mt-0 md:ml-4">
                   <button onClick={() => openDetails(player)} className="px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition-colors border border-slate-700/50">Ficha</button>
                   <button onClick={() => openForm(player)} className="px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg text-[11px] font-medium border border-blue-500/20 transition-colors">Editar</button>
@@ -232,7 +224,6 @@ export default function PlayersModule() {
     );
   }
 
-  // VISTA 2: DETALHES DO JOGADOR
   if (view === 'details' && current) {
     return (
       <div className="p-2 md:p-6 max-w-4xl mx-auto">
@@ -304,7 +295,6 @@ export default function PlayersModule() {
     );
   }
 
-  // VISTA 3: FORMULÁRIO (CRIAR / EDITAR)
   return (
     <div className="p-2 md:p-6 max-w-3xl mx-auto">
       {renderModal()}
