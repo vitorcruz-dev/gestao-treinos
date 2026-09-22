@@ -148,12 +148,6 @@ export default function App() {
     if (data) setTeams([mapTeam(data), ...teams]);
   };
 
-  const handleAddStaff = async (s: StaffMember) => {
-    const payload = { username: s.username, password: s.password, name: s.name, age: s.age, address: s.address, phone: s.phone, role: s.role };
-    const { data } = await supabase.from('staff').insert([payload]).select().single();
-    if (data) setStaffList([...staffList, mapStaff(data)]);
-  };
-
   const handleAddTrainingPlan = async (p: TrainingPlan) => {
     const payload = { team_id: activeTeam!.id, date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation };
     const { data } = await supabase.from('training_plans').insert([payload]).select().single();
@@ -271,8 +265,8 @@ export default function App() {
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 text-slate-900 pb-24 md:pb-12 custom-scrollbar">
           <div className="max-w-7xl mx-auto" key={activeTeam.id}>
             {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
-            {activeTab === 'admin' && isAdmin && <AdminModule staff={staffList} onAddStaff={handleAddStaff} />}
-            {activeTab === 'players' && <PlayersModule />} {/* <-- AQUI ESTÁ A CORREÇÃO (Sem as props antigas) */}
+            {activeTab === 'admin' && isAdmin && <AdminModule />} {/* <-- CORREÇÃO FEITA AQUI */}
+            {activeTab === 'players' && <PlayersModule />}
             {activeTab === 'training_plan' && <TrainingPlannerModule plans={trainingPlans} onAddPlan={handleAddTrainingPlan} onUpdatePlan={handleUpdateTrainingPlan} />}
             {activeTab === 'training' && <TrainingModule players={playersList} />}
             {activeTab === 'match' && <MatchModule players={playersList} reports={matchReports} onAddReport={handleAddMatchReport} />}
