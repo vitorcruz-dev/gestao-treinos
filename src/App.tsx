@@ -37,15 +37,23 @@ export default function App() {
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  // ESTADO PARA BLOQUEAR ACESSO COM PASS PROVISÓRIA
   const [pendingPasswordChangeUser, setPendingPasswordChangeUser] = useState<StaffMember | null>(null);
-  
   const [loginError, setLoginError] = useState('');
   
   const [activeTeam, setActiveTeam] = useState<Team | null>(() => {
     const savedTeam = localStorage.getItem('scoutpro_active_team');
     return savedTeam ? JSON.parse(savedTeam) : null;
   });
+
+  // ESTADO PARA OCULTAR/MOSTRAR A BARRA LATERAL (Memoriza a sua escolha)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('scoutpro_sidebar_open');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('scoutpro_sidebar_open', JSON.stringify(isSidebarOpen));
+  }, [isSidebarOpen]);
 
   useEffect(() => {
     if (activeTeam) {
@@ -134,7 +142,6 @@ export default function App() {
     return () => { clearInterval(intervalId); events.forEach(event => window.removeEventListener(event, updateActivity)); };
   }, [currentUser, handleLogout, updateActivity]);
 
-  // LOGIN ATUALIZADO COM VERIFICAÇÃO DE PASS PROVISÓRIA
   const handleLogin = async (user: string, pass: string) => {
     const { data } = await supabase.from('staff').select('*').eq('username', user).eq('password', pass).single();
     if (data) { 
@@ -156,30 +163,20 @@ export default function App() {
     const p1 = fd.get('p1') as string;
     const p2 = fd.get('p2') as string;
 
-    if (p1 !== p2) {
-      alert("As senhas não coincidem!");
-      return;
-    }
-    if (p1.length < 6) {
-      alert("A nova senha deve ter pelo menos 6 caracteres.");
-      return;
-    }
+    if (p1 !== p2) { alert("As senhas não coincidem!"); return; }
+    if (p1.length < 6) { alert("A nova senha deve ter pelo menos 6 caracteres."); return; }
 
     if (pendingPasswordChangeUser) {
       const { error } = await supabase.from('staff').update({ password: p1, must_change_password: false }).eq('id', pendingPasswordChangeUser.id);
       if (!error) {
         const u = { ...pendingPasswordChangeUser, password: p1 };
-        setCurrentUser(u);
-        setPendingPasswordChangeUser(null);
+        setCurrentUser(u); setPendingPasswordChangeUser(null);
         localStorage.setItem('scoutpro_user', JSON.stringify(u));
         localStorage.setItem('scoutpro_last_activity', Date.now().toString());
-      } else {
-        alert("Erro ao alterar senha: " + error.message);
-      }
+      } else { alert("Erro ao alterar senha: " + error.message); }
     }
   };
 
-  // ECRÃ OBRIGATÓRIO DE NOVA PASSWORD
   if (pendingPasswordChangeUser) {
     return (
       <div className="flex h-screen bg-[#090e17] items-center justify-center p-4">
@@ -276,35 +273,38 @@ export default function App() {
   return (
     <div className="flex h-screen bg-[#090e17] text-slate-200 font-sans overflow-hidden">
       
-      <aside className="hidden md:flex w-64 bg-[#0f1523] border-r border-slate-800/60 flex-col z-20 shadow-xl">
-        <div className="p-6 border-b border-slate-800/60">
-          <div className="flex items-center justify-between mb-5">
-            <div className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center border border-slate-700/50 shadow-sm"><span className="text-white font-bold text-[11px]">SP<span className="text-blue-500">.</span></span></div>
-            <button onClick={() => setActiveTeam(null)} className="text-[10px] uppercase font-semibold text-slate-500 hover:text-slate-300 transition-colors tracking-wider">Trocar Equipa</button>
+      {/* BARRA LATERAL COM ANIMAÇÃO DE RECOLHER */}
+      <aside className={`hidden md:flex bg-[#0f1523] border-slate-800/60 flex-col z-20 shadow-xl transition-all duration-300 ease-in-out ${isSidebarOpen ? 'w-64 border-r' : 'w-0 border-none'}`}>
+        <div className="w-64 flex flex-col h-full overflow-hidden">
+          <div className="p-6 border-b border-slate-800/60">
+            <div className="flex items-center justify-between mb-5">
+              <div className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center border border-slate-700/50 shadow-sm"><span className="text-white font-bold text-[11px]">SP<span className="text-blue-500">.</span></span></div>
+              <button onClick={() => setActiveTeam(null)} className="text-[10px] uppercase font-semibold text-slate-500 hover:text-slate-300 transition-colors tracking-wider">Trocar Equipa</button>
+            </div>
+            <h1 className="text-base font-semibold text-white tracking-tight leading-tight truncate">{activeTeam.club}</h1>
+            <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-medium">{activeTeam.name} • {activeTeam.year}</p>
           </div>
-          <h1 className="text-base font-semibold text-white tracking-tight leading-tight truncate">{activeTeam.club}</h1>
-          <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-medium">{activeTeam.name} • {activeTeam.year}</p>
-        </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto custom-scrollbar">
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 px-2">Menu Principal</div>
-          {menuItems.map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 text-sm ${activeTab === item.id ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 border border-transparent'}`}>
-              <span className="text-base opacity-80">{item.icon}</span>{item.label}
-            </button>
-          ))}
-        </nav>
+          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto custom-scrollbar">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 px-2">Menu Principal</div>
+            {menuItems.map(item => (
+              <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 text-sm ${activeTab === item.id ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 border border-transparent'}`}>
+                <span className="text-base opacity-80">{item.icon}</span>{item.label}
+              </button>
+            ))}
+          </nav>
 
-        <div className="p-5 border-t border-slate-800/60 bg-[#0f1523]">
-          <div 
-            onClick={() => setActiveTab('account')}
-            className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600/50 transition-all"
-            title="Ir para as Definições da Conta"
-          >
-            <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-sm">{currentUser.name.charAt(0)}</div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
-              <p className="text-[9px] text-slate-400 truncate uppercase tracking-widest mt-0.5">{currentUser.role}</p>
+          <div className="p-5 border-t border-slate-800/60 bg-[#0f1523]">
+            <div 
+              onClick={() => setActiveTab('account')}
+              className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600/50 transition-all"
+              title="Ir para as Definições da Conta"
+            >
+              <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-sm">{currentUser.name.charAt(0)}</div>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
+                <p className="text-[9px] text-slate-400 truncate uppercase tracking-widest mt-0.5">{currentUser.role}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -324,6 +324,11 @@ export default function App() {
           </div>
           
           <div className="hidden md:flex items-center gap-4">
+             {/* BOTÃO PARA MOSTRAR/OCULTAR A BARRA LATERAL */}
+             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700" title="Alternar Menu">
+               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+             </button>
+             
              {activeTab !== 'dashboard' && (
                <button onClick={handleGoBack} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700" title="Voltar atrás">
                  <span className="font-medium text-lg leading-none mb-0.5">←</span>
