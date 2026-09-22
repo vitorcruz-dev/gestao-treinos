@@ -45,7 +45,6 @@ export default function App() {
     return savedTeam ? JSON.parse(savedTeam) : null;
   });
 
-  // ESTADO PARA OCULTAR/MOSTRAR A BARRA LATERAL (Memoriza a sua escolha)
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('scoutpro_sidebar_open');
     return saved !== null ? JSON.parse(saved) : true;
@@ -273,10 +272,11 @@ export default function App() {
   return (
     <div className="flex h-screen bg-[#090e17] text-slate-200 font-sans overflow-hidden">
       
-      {/* BARRA LATERAL COM ANIMAÇÃO DE RECOLHER */}
-      <aside className={`hidden md:flex bg-[#0f1523] border-slate-800/60 flex-col z-20 shadow-xl transition-all duration-300 ease-in-out ${isSidebarOpen ? 'w-64 border-r' : 'w-0 border-none'}`}>
-        <div className="w-64 flex flex-col h-full overflow-hidden">
-          <div className="p-6 border-b border-slate-800/60">
+      {/* BARRA LATERAL COM A CORREÇÃO DE OVERFLOW (Agora esconde o texto ao fechar) */}
+      <aside className={`hidden md:flex bg-[#0f1523] flex-col z-20 shadow-xl transition-all duration-300 ease-in-out overflow-hidden ${isSidebarOpen ? 'w-64 border-r border-slate-800/60 opacity-100' : 'w-0 border-none opacity-0'}`}>
+        {/* A largura fixa de w-64 aqui garante que o layout interno nunca é esmagado */}
+        <div className="w-64 flex flex-col h-screen">
+          <div className="p-6 border-b border-slate-800/60 shrink-0">
             <div className="flex items-center justify-between mb-5">
               <div className="bg-slate-800/50 w-8 h-8 rounded-lg flex items-center justify-center border border-slate-700/50 shadow-sm"><span className="text-white font-bold text-[11px]">SP<span className="text-blue-500">.</span></span></div>
               <button onClick={() => setActiveTeam(null)} className="text-[10px] uppercase font-semibold text-slate-500 hover:text-slate-300 transition-colors tracking-wider">Trocar Equipa</button>
@@ -294,7 +294,7 @@ export default function App() {
             ))}
           </nav>
 
-          <div className="p-5 border-t border-slate-800/60 bg-[#0f1523]">
+          <div className="p-5 border-t border-slate-800/60 bg-[#0f1523] shrink-0">
             <div 
               onClick={() => setActiveTab('account')}
               className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600/50 transition-all"
@@ -324,7 +324,6 @@ export default function App() {
           </div>
           
           <div className="hidden md:flex items-center gap-4">
-             {/* BOTÃO PARA MOSTRAR/OCULTAR A BARRA LATERAL */}
              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700" title="Alternar Menu">
                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
              </button>
