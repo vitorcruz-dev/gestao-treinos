@@ -120,7 +120,6 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
       setIsDrawing(true);
       setLastPos(pos);
     } else {
-      // Estampar Ícone
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext('2d');
       if (!ctx) return;
@@ -176,9 +175,8 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
 
   return (
     <div className="w-full flex flex-col gap-3">
-      {/* Barra de Ferramentas */}
       <div className="flex flex-wrap gap-2 bg-[#090e17] p-3 rounded-xl border border-slate-700/80">
-        {toolsList.map(t => (
+        {toolsList.map((t: any) => (
           <button
             key={t.id}
             type="button"
@@ -193,7 +191,6 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
         <button type="button" onClick={handleClear} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white">🗑️ Limpar</button>
       </div>
 
-      {/* Canvas */}
       <div className="w-full bg-[#090e17] rounded-xl border-2 border-slate-700/80 overflow-hidden relative" style={{ touchAction: 'none' }}>
         <canvas
           ref={canvasRef}
@@ -204,7 +201,7 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
-          style={{ touchAction: 'none' }} // Evita scroll do telemóvel ao desenhar
+          style={{ touchAction: 'none' }} 
         />
       </div>
     </div>
@@ -216,10 +213,10 @@ const TacticalCanvas = ({ defaultImage, onChange }: { defaultImage?: string, onC
 // ==========================================
 export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }: TrainingPlannerProps) {
   const [view, setView] = useState<'list' | 'form' | 'details'>('list');
-  const [current, setCurrent] = useState<any | null>(null); // any para aceitar board_image
+  const [current, setCurrent] = useState<any | null>(null); 
   
   const [exercises, setExercises] = useState<any[]>([]);
-  const [boardImage, setBoardImage] = useState<string>(''); // Guarda o estado do desenho
+  const [boardImage, setBoardImage] = useState<string>(''); 
 
   const [modal, setModal] = useState<{
     show: boolean;
@@ -246,7 +243,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
       theme: fd.get('theme') as string,
       finalAppreciation: fd.get('finalAppreciation') as string,
       exercises: exercises,
-      board_image: boardImage // Salva o quadro tático!
+      board_image: boardImage 
     };
 
     if (current) onUpdatePlan(planData);
@@ -337,7 +334,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {plans.map(plan => {
               const planExercises = Array.isArray(plan.exercises) ? plan.exercises : [];
-              const validCount = planExercises.filter(ex => ex.title?.trim() || ex.description?.trim()).length;
+              const validCount = planExercises.filter((ex: any) => ex.title?.trim() || ex.description?.trim()).length;
               const hasDrawing = !!(plan as any).board_image;
 
               return (
@@ -378,7 +375,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
   // VISTA 2: DETALHES E IMPRESSÃO
   if (view === 'details' && current) {
     const currentExercises = Array.isArray(current.exercises) ? current.exercises : [];
-    const validExercises = currentExercises.filter(ex => (ex.title && ex.title.trim() !== '') || (ex.description && ex.description.trim() !== ''));
+    const validExercises = currentExercises.filter((ex: any) => (ex.title && ex.title.trim() !== '') || (ex.description && ex.description.trim() !== ''));
 
     return (
       <div className="p-2 md:p-6 max-w-4xl mx-auto">
@@ -525,7 +522,7 @@ export default function TrainingPlannerModule({ plans, onAddPlan, onUpdatePlan }
               </div>
             ) : (
               <div className="space-y-4">
-                {exercises.map((ex, index) => (
+                {exercises.map((ex: any, index: number) => (
                   <div key={index} className="bg-[#0f1523] p-4 rounded-xl border border-slate-700/80 relative group">
                     <button type="button" onClick={() => removeExercise(index)} className="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-sm font-bold transition-colors">✕</button>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3 pr-8">
