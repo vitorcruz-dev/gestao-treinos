@@ -56,32 +56,29 @@ export default function App() {
     return (savedTab as TabType) || 'dashboard';
   });
   
-  // HISTÓRICO DE NAVEGAÇÃO PARA A SETA DE RETROCEDER
   const [tabHistory, setTabHistory] = useState<TabType[]>([activeTab]);
 
   useEffect(() => {
     localStorage.setItem('scoutpro_active_tab', activeTab);
     
-    // Adicionar ao histórico sempre que muda de separador (sem duplicar se já estiver lá)
     setTabHistory(prev => {
       if (prev[prev.length - 1] === activeTab) return prev;
       const newHistory = [...prev, activeTab];
-      if (newHistory.length > 15) newHistory.shift(); // Manter apenas as últimas 15 páginas
+      if (newHistory.length > 15) newHistory.shift(); 
       return newHistory;
     });
   }, [activeTab]);
 
-  // FUNÇÃO DO BOTÃO RETROCEDER
   const handleGoBack = () => {
     setTabHistory(prev => {
       if (prev.length > 1) {
         const newHistory = [...prev];
-        newHistory.pop(); // Remove a página atual
-        const previousTab = newHistory[newHistory.length - 1]; // Descobre a anterior
+        newHistory.pop(); 
+        const previousTab = newHistory[newHistory.length - 1]; 
         setActiveTab(previousTab);
         return newHistory;
       }
-      setActiveTab('dashboard'); // Se não houver histórico, vai para o Início
+      setActiveTab('dashboard'); 
       return ['dashboard'];
     });
   };
@@ -155,12 +152,6 @@ export default function App() {
     const payload = { username: s.username, password: s.password, name: s.name, age: s.age, address: s.address, phone: s.phone, role: s.role };
     const { data } = await supabase.from('staff').insert([payload]).select().single();
     if (data) setStaffList([...staffList, mapStaff(data)]);
-  };
-
-  const handleAddPlayer = async (p: Player) => {
-    const payload = { team_id: activeTeam!.id, name: p.name, age: p.age, position: p.position, preferred_foot: p.preferredFoot, birth_date: p.birthDate, notes: p.notes, photo_url: p.photoUrl };
-    const { data } = await supabase.from('players').insert([payload]).select().single();
-    if (data) setPlayersList([mapPlayer(data), ...playersList]);
   };
 
   const handleAddTrainingPlan = async (p: TrainingPlan) => {
@@ -250,10 +241,8 @@ export default function App() {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* CABEÇALHO ATUALIZADO COM BOTÃO DE RETROCEDER */}
         <header className="bg-[#151c2c] border-b border-slate-800 px-4 md:px-8 py-4 flex justify-between items-center z-10 shadow-md">
           
-          {/* LADO ESQUERDO MOBILE */}
           <div className="flex items-center gap-3 md:hidden">
              {activeTab !== 'dashboard' && (
                <button onClick={handleGoBack} className="bg-slate-800 w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 border border-slate-700 active:bg-slate-700">
@@ -264,7 +253,6 @@ export default function App() {
              <div className="flex flex-col"><h1 className="text-sm font-black text-white leading-none">{activeTeam.club}</h1><span className="text-[9px] text-slate-400">{activeTeam.year}</span></div>
           </div>
           
-          {/* LADO ESQUERDO DESKTOP */}
           <div className="hidden md:flex items-center gap-4">
              {activeTab !== 'dashboard' && (
                <button onClick={handleGoBack} className="bg-slate-800 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 border border-slate-700 hover:text-white hover:bg-slate-700 transition-colors" title="Voltar atrás">
@@ -284,7 +272,7 @@ export default function App() {
           <div className="max-w-7xl mx-auto" key={activeTeam.id}>
             {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
             {activeTab === 'admin' && isAdmin && <AdminModule staff={staffList} onAddStaff={handleAddStaff} />}
-            {activeTab === 'players' && <PlayersModule players={playersList} onAddPlayer={handleAddPlayer} />}
+            {activeTab === 'players' && <PlayersModule />} {/* <-- AQUI ESTÁ A CORREÇÃO (Sem as props antigas) */}
             {activeTab === 'training_plan' && <TrainingPlannerModule plans={trainingPlans} onAddPlan={handleAddTrainingPlan} onUpdatePlan={handleUpdateTrainingPlan} />}
             {activeTab === 'training' && <TrainingModule players={playersList} />}
             {activeTab === 'match' && <MatchModule players={playersList} reports={matchReports} onAddReport={handleAddMatchReport} />}
