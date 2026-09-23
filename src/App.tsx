@@ -23,14 +23,12 @@ const mapPlayer = (row: any): Player => ({ id: row.id, teamId: row.team_id, name
 const mapMatch = (row: any): MatchReport => ({ id: row.id, teamId: row.team_id, date: row.date, opponent: row.opponent, oppTacticalSystem: row.opp_tactical_system, oppBehaviorWinning: row.opp_behavior_winning, oppBehaviorLosing: row.opp_behavior_losing, oppSubstitutions: row.opp_substitutions, oppSetPieces: row.opp_set_pieces, oppFinalEval: row.opp_final_eval, ownInitialSystem: row.own_initial_system, ownFinalSystem: row.own_final_system, ownTeamPositives: row.own_team_positives, ownTeamNegatives: row.own_team_negatives, goalsScored: row.goals_scored, goalsConceded: row.goals_conceded, individualEvals: row.individual_evals });
 const mapPlan = (row: any): TrainingPlan => ({ id: row.id, teamId: row.team_id, date: row.date, theme: row.theme, exercises: row.exercises, finalAppreciation: row.final_appreciation, board_image: row.board_image });
 
-// MAPEAMENTO DO NOVO RELATÓRIO DE SCOUTING
 const mapScouting = (row: any): FutureOpponentScouting => ({ 
   id: row.id, teamId: row.team_id, opponentName: row.opponent_name, observationDate: row.observation_date, 
   tacticalModel: row.tactical_model, behaviorWinning: row.behavior_winning, behaviorLosing: row.behavior_losing, 
   substitutionsImpact: row.substitutions_impact, setPieces: row.set_pieces, setPiecesPhotoUrl: row.set_pieces_photo_url, 
   strengths: row.strengths, weaknesses: row.weaknesses, strongPlayers: row.strong_players, weakPlayers: row.weak_players, 
-  observations: row.observations,
-  attackingFormation: row.attacking_formation, defendingFormation: row.defending_formation,
+  observations: row.observations, attackingFormation: row.attacking_formation, defendingFormation: row.defending_formation,
   formationBoardImage: row.formation_board_image, offensiveCorners: row.offensive_corners,
   defensiveCorners: row.defensive_corners, offensiveCornersPhotoUrl: row.offensive_corners_photo_url,
   defensiveCornersPhotoUrl: row.defensive_corners_photo_url
@@ -223,15 +221,40 @@ export default function App() {
     if (data) setTeams([mapTeam(data), ...teams]);
   };
 
+  // GRAVAR NOVO TREINO NO SUPABASE (COM AVISO DE ERRO)
   const handleAddTrainingPlan = async (p: TrainingPlan) => {
-    const payload = { team_id: activeTeam!.id, date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation, board_image: p.board_image };
-    const { data } = await supabase.from('training_plans').insert([payload]).select().single();
+    const payload = { 
+      team_id: activeTeam!.id, 
+      date: p.date, 
+      theme: p.theme, 
+      exercises: p.exercises, 
+      final_appreciation: p.finalAppreciation, 
+      board_image: p.board_image 
+    };
+    const { data, error } = await supabase.from('training_plans').insert([payload]).select().single();
+    if (error) {
+      alert("Erro ao guardar treino no Supabase: " + error.message);
+      console.error(error);
+      return;
+    }
     if (data) setTrainingPlans([mapPlan(data), ...trainingPlans]);
   };
 
+  // ATUALIZAR TREINO NO SUPABASE (COM AVISO DE ERRO)
   const handleUpdateTrainingPlan = async (p: TrainingPlan) => {
-    const payload = { date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation, board_image: p.board_image };
-    const { data } = await supabase.from('training_plans').update(payload).eq('id', p.id).select().single();
+    const payload = { 
+      date: p.date, 
+      theme: p.theme, 
+      exercises: p.exercises, 
+      final_appreciation: p.finalAppreciation, 
+      board_image: p.board_image 
+    };
+    const { data, error } = await supabase.from('training_plans').update(payload).eq('id', p.id).select().single();
+    if (error) {
+      alert("Erro ao atualizar treino no Supabase: " + error.message);
+      console.error(error);
+      return;
+    }
     if (data) {
       const updated = mapPlan(data);
       setTrainingPlans(trainingPlans.map(plan => plan.id === updated.id ? updated : plan));
