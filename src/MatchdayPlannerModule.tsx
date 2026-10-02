@@ -128,10 +128,14 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
   const [current, setCurrent] = useState<any | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
-  // Estados Formuáiro
+  // Estados Formulário
   const [startingEleven, setStartingEleven] = useState<StartingPlayerPosition[]>([]);
   const [warmupExercises, setWarmupExercises] = useState<any[]>([]);
   const [pressureType, setPressureType] = useState<'alta' | 'media' | 'baixa'>('media');
+
+  // Variáveis para Drag-and-Drop do Campo
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const activeTeam = JSON.parse(localStorage.getItem('scoutpro_active_team') || '{}');
 
@@ -177,6 +181,7 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
     }
   };
 
+  // Funções de 11 Inicial e Drag-and-Drop
   const addPlayerToStartingEleven = (player: Player) => {
     if (startingEleven.some(p => p.playerId === player.id)) return;
     if (startingEleven.length >= 11) {
@@ -210,6 +215,27 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
     setStartingEleven(startingEleven.filter(p => p.playerId !== id));
   };
 
+  const handleFieldPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingId || !fieldRef.current) return;
+    
+    // Calcula a posição exata em percentagem baseada no clique
+    const rect = fieldRef.current.getBoundingClientRect();
+    let x = ((e.clientX - rect.left) / rect.width) * 100;
+    let y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    // Limita para não sair do quadro
+    x = Math.max(0, Math.min(100, x));
+    y = Math.max(0, Math.min(100, y));
+
+    setStartingEleven(prev => prev.map(p => p.playerId === draggingId ? { ...p, x, y } : p));
+  };
+
+  const handleFieldPointerUp = () => {
+    if (draggingId) {
+      setDraggingId(null);
+    }
+  };
+
   const handleDownloadPDF = async () => {
     const element = document.getElementById('matchday-pdf');
     if (!element) return;
@@ -233,7 +259,7 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
           <div>
             <h2 className="text-2xl font-semibold text-white tracking-tight mb-1">Dia do Jogo (Matchday)</h2>
-            <p className="text-sm text-slate-400">Planeie a palestra, o 11 inicial, o aquecimento e bolas paradas.</p>
+            <p className="text-sm text-slate-400">Planeie a palestra, o 11 inicial, o aquecimento e as bolas paradas.</p>
           </div>
           <button onClick={() => openForm()} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 shadow-lg flex gap-2 items-center">
             <span>+</span> Novo Plano de Jogo
@@ -320,18 +346,43 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
                   </div>
                 </div>
 
-                <div className="md:col-span-2 bg-[#0a111e] rounded-xl border-2 border-slate-800 h-96 relative overflow-hidden flex items-center justify-center">
+                {/* CAMPO DE JOGO INTERATIVO COM DRAG AND DROP */}
+                <div 
+                  ref={fieldRef}
+                  onPointerMove={handleFieldPointerMove}
+                  onPointerUp={handleFieldPointerUp}
+                  onPointerLeave={handleFieldPointerUp}
+                  className="md:col-span-2 bg-[#0a111e] rounded-xl border-2 border-slate-800 h-96 relative overflow-hidden flex items-center justify-center touch-none"
+                >
                   <div className="absolute inset-4 border border-white/20 rounded-lg pointer-events-none">
                     <div className="absolute top-1/2 left-0 right-0 border-t border-white/20"></div>
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 border border-white/20 rounded-full"></div>
                   </div>
 
                   {startingEleven.map(p => (
-                    <div key={p.playerId} style={{ top: `${p.y}%`, left: `${p.x}%` }} className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group cursor-pointer" onClick={() => removePlayerFromEleven(p.playerId)} title="Clique para remover">
-                      <div className="w-10 h-10 rounded-full bg-blue-600 border-2 border-white shadow-lg overflow-hidden flex items-center justify-center font-bold text-xs text-white group-hover:scale-110 transition-transform">
+                    <div 
+                      key={p.playerId} 
+                      style={{ top: `${p.y}%`, left: `${p.x}%` }} 
+                      className={`absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group touch-none ${draggingId === p.playerId ? 'cursor-grabbing z-50 scale-110' : 'cursor-grab z-10 hover:scale-105'} transition-transform duration-75`}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingId(p.playerId);
+                      }}
+                    >
+                      {/* Botão Remover (Sempre visível como "x") */}
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.stopPropagation(); removePlayerFromEleven(p.playerId); }}
+                        className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold shadow-md z-20 pointer-events-auto"
+                        title="Remover Jogador"
+                      >
+                        ✕
+                      </button>
+
+                      <div className="w-10 h-10 rounded-full bg-blue-600 border-2 border-white shadow-lg overflow-hidden flex items-center justify-center font-bold text-xs text-white pointer-events-none">
                         {p.photoUrl ? <img src={p.photoUrl} alt={p.playerName} className="w-full h-full object-cover" /> : p.playerName.charAt(0)}
                       </div>
-                      <span className="text-[10px] font-bold text-white bg-slate-900/90 px-1.5 py-0.5 rounded mt-0.5 shadow">{p.positionName} - {p.playerName.split(' ')[0]}</span>
+                      <span className="text-[10px] font-bold text-white bg-slate-900/90 px-1.5 py-0.5 rounded mt-0.5 shadow pointer-events-none">{p.positionName} - {p.playerName.split(' ')[0]}</span>
                     </div>
                   ))}
                 </div>
@@ -442,7 +493,7 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
                 <p className="text-[11px] text-slate-700 whitespace-pre-wrap">{current.offensiveCorners || 'Sem indicações.'}</p>
               </div>
               <div>
-                <h3 className="text-xs font-black uppercase text-slate-900 mb-1">🛡️️ Cantos Defensivos</h3>
+                <h3 className="text-xs font-black uppercase text-slate-900 mb-1">🛡 Cantos Defensivos</h3>
                 <p className="text-[11px] text-slate-700 whitespace-pre-wrap">{current.defensiveCorners || 'Sem indicações.'}</p>
               </div>
             </div>
