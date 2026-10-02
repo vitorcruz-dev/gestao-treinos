@@ -181,7 +181,14 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
     }
   };
 
-  // Funções de 11 Inicial e Drag-and-Drop
+  // Lógica inteligente para atribuir posição consoante as coordenadas (X,Y)
+  const getDynamicPosition = (x: number, y: number) => {
+    if (y > 85) return 'GR';
+    if (y > 65) return x < 33 ? 'LE' : x > 66 ? 'LD' : 'DC';
+    if (y > 35) return x < 33 ? 'ME' : x > 66 ? 'MD' : 'MC';
+    return x < 33 ? 'EE' : x > 66 ? 'ED' : 'PL';
+  };
+
   const addPlayerToStartingEleven = (player: Player) => {
     if (startingEleven.some(p => p.playerId === player.id)) return;
     if (startingEleven.length >= 11) {
@@ -190,13 +197,14 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
     }
 
     const defaultCoords = [
-      { x: 50, y: 88, pos: 'GR' },
-      { x: 20, y: 70, pos: 'LE' }, { x: 40, y: 75, pos: 'DC' }, { x: 60, y: 75, pos: 'DC' }, { x: 80, y: 70, pos: 'LD' },
-      { x: 35, y: 50, pos: 'MC' }, { x: 65, y: 50, pos: 'MC' }, { x: 50, y: 35, pos: 'MO' },
-      { x: 20, y: 20, pos: 'EE' }, { x: 50, y: 15, pos: 'PL' }, { x: 80, y: 20, pos: 'ED' },
+      { x: 50, y: 88 },
+      { x: 20, y: 70 }, { x: 40, y: 75 }, { x: 60, y: 75 }, { x: 80, y: 70 },
+      { x: 35, y: 50 }, { x: 65, y: 50 }, { x: 50, y: 35 },
+      { x: 20, y: 20 }, { x: 50, y: 15 }, { x: 80, y: 20 },
     ];
 
-    const nextSpot = defaultCoords[startingEleven.length] || { x: 50, y: 50, pos: player.position };
+    const nextSpot = defaultCoords[startingEleven.length] || { x: 50, y: 50 };
+    const dynamicPos = getDynamicPosition(nextSpot.x, nextSpot.y);
 
     setStartingEleven([
       ...startingEleven,
@@ -204,7 +212,7 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
         playerId: player.id,
         playerName: player.name,
         photoUrl: player.photoUrl,
-        positionName: nextSpot.pos,
+        positionName: dynamicPos,
         x: nextSpot.x,
         y: nextSpot.y,
       }
@@ -218,16 +226,21 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
   const handleFieldPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!draggingId || !fieldRef.current) return;
     
-    // Calcula a posição exata em percentagem baseada no clique
     const rect = fieldRef.current.getBoundingClientRect();
     let x = ((e.clientX - rect.left) / rect.width) * 100;
     let y = ((e.clientY - rect.top) / rect.height) * 100;
 
-    // Limita para não sair do quadro
     x = Math.max(0, Math.min(100, x));
     y = Math.max(0, Math.min(100, y));
 
-    setStartingEleven(prev => prev.map(p => p.playerId === draggingId ? { ...p, x, y } : p));
+    // ATUALIZA A POSIÇÃO DINAMICAMENTE ENQUANTO ARRASTA!
+    const newPositionName = getDynamicPosition(x, y);
+
+    setStartingEleven(prev => prev.map(p => 
+      p.playerId === draggingId 
+        ? { ...p, x, y, positionName: newPositionName } 
+        : p
+    ));
   };
 
   const handleFieldPointerUp = () => {
@@ -369,7 +382,6 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
                         setDraggingId(p.playerId);
                       }}
                     >
-                      {/* Botão Remover (Sempre visível como "x") */}
                       <button 
                         type="button" 
                         onClick={(e) => { e.stopPropagation(); removePlayerFromEleven(p.playerId); }}
@@ -464,7 +476,7 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
                       <div className="w-7 h-7 rounded-full bg-blue-600 border border-white overflow-hidden flex items-center justify-center font-bold text-[9px] text-white">
                         {p.photoUrl ? <img src={p.photoUrl} alt="" className="w-full h-full object-cover" /> : p.playerName.charAt(0)}
                       </div>
-                      <span className="text-[8px] font-bold text-white bg-slate-900 px-1 rounded mt-0.5">{p.playerName.split(' ')[0]}</span>
+                      <span className="text-[8px] font-bold text-white bg-slate-900 px-1 rounded mt-0.5">{p.positionName} - {p.playerName.split(' ')[0]}</span>
                     </div>
                   ))}
                 </div>
