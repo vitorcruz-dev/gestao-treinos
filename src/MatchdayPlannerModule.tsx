@@ -137,7 +137,20 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
   const fieldRef = useRef<HTMLDivElement>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
+  // ESTADO DO MODAL INTERNO
+  const [modal, setModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    onConfirm: (() => void) | null;
+    type: 'alert' | 'confirm';
+  }>({ show: false, title: '', message: '', onConfirm: null, type: 'alert' });
+
   const activeTeam = JSON.parse(localStorage.getItem('scoutpro_active_team') || '{}');
+
+  const openAlert = (title: string, message: string) => setModal({ show: true, title, message, onConfirm: null, type: 'alert' });
+  const openConfirm = (title: string, message: string, onConfirm: () => void) => setModal({ show: true, title, message, onConfirm, type: 'confirm' });
+  const closeModal = () => setModal(prev => ({ ...prev, show: false }));
 
   const openForm = (plan: any | null = null) => {
     setCurrent(plan);
@@ -170,22 +183,26 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
     setView('list');
   };
 
-  const handleDeleteClick = async (id: string, opponent: string) => {
-    if(!window.confirm(`Tem a certeza que deseja eliminar o plano contra ${opponent}?`)) return;
-    try {
-      const { error } = await supabase.from('matchday_plans').delete().eq('id', id);
-      if (error) alert("Erro ao eliminar: " + error.message);
-      else window.location.reload();
-    } catch (err: any) {
-      alert("Erro ao eliminar: " + err.message);
-    }
+  const handleDeleteClick = (id: string, opponent: string) => {
+    openConfirm(
+      "Eliminar Plano de Jogo",
+      `Tem a certeza que deseja eliminar o plano do jogo contra ${opponent}?`,
+      async () => {
+        try {
+          const { error } = await supabase.from('matchday_plans').delete().eq('id', id);
+          if (error) openAlert("Erro", `Erro ao eliminar: ${error.message}`);
+          else window.location.reload();
+        } catch (err: any) {
+          openAlert("Erro", `Erro ao eliminar: ${err.message}`);
+        }
+      }
+    );
   };
 
   // =========================================================
   // GESTÃO INTELIGENTE DE COORDENADAS E NOMENCLATURA TÁTICA
   // =========================================================
 
-  // Transforma coordenadas percentuais em siglas (Ex: Y > 60 vira Defesa)
   const getDynamicPosition = (x: number, y: number) => {
     if (y > 82) return 'GR';
     if (y > 60) return x < 30 ? 'LE' : x > 70 ? 'LD' : 'DC';
@@ -193,23 +210,20 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
     return x < 30 ? 'EE' : x > 70 ? 'ED' : 'PL';
   };
 
-  // Motor Inteligente para decidir para onde o jogador vai ao clicar nele
   const addPlayerToStartingEleven = (player: Player) => {
     if (startingEleven.some(p => p.playerId === player.id)) return;
     if (startingEleven.length >= 11) {
-      alert("O 11 Inicial já está completo!");
+      openAlert("Equipa Completa", "O 11 Inicial já está completo!");
       return;
     }
 
-    // 1. Descobrir a posição "padrão" do jogador vinda do Perfil
     const posStr = (player.position || '').toLowerCase();
-    let sector = 'MED'; // Omissão caso a sigla seja estranha
+    let sector = 'MED'; 
     if (posStr.includes('gr') || posStr.includes('guarda')) sector = 'GR';
     else if (posStr.includes('def') || posStr.includes('lat') || posStr.includes('central')) sector = 'DEF';
     else if (posStr.includes('med') || posStr.includes('méd') || posStr.includes('trinco')) sector = 'MED';
     else if (posStr.includes('ava') || posStr.includes('ext') || posStr.includes('pont')) sector = 'AVA';
 
-    // 2. Contar quantos jogadores já lá estão no mesmo setor para os distribuir
     let sectorCount = 0;
     startingEleven.forEach(ep => {
       if (ep.y > 82 && sector === 'GR') sectorCount++;
@@ -218,31 +232,30 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
       else if (ep.y <= 32 && sector === 'AVA') sectorCount++;
     });
 
-    // 3. Atribuir a coordenada consoante o número de "colegas" já lá colocados
     let x = 50, y = 50;
 
     if (sector === 'GR') {
       y = 88; x = 50;
     } else if (sector === 'DEF') {
       y = 75;
-      if (sectorCount === 0) x = 40; // 1º Central
-      else if (sectorCount === 1) x = 60; // 2º Central
-      else if (sectorCount === 2) x = 15; // Lateral Esquerdo
-      else if (sectorCount === 3) x = 85; // Lateral Direito
+      if (sectorCount === 0) x = 40; 
+      else if (sectorCount === 1) x = 60; 
+      else if (sectorCount === 2) x = 15; 
+      else if (sectorCount === 3) x = 85; 
       else { x = 50; y = 70; } 
     } else if (sector === 'MED') {
       y = 50;
-      if (sectorCount === 0) x = 50; // MC / Trinco
-      else if (sectorCount === 1) x = 30; // Interior Esq
-      else if (sectorCount === 2) x = 70; // Interior Dir
-      else if (sectorCount === 3) { x = 50; y = 35; } // Nº 10
+      if (sectorCount === 0) x = 50; 
+      else if (sectorCount === 1) x = 30; 
+      else if (sectorCount === 2) x = 70; 
+      else if (sectorCount === 3) { x = 50; y = 35; } 
       else { x = 50; y = 45; }
     } else if (sector === 'AVA') {
       y = 15;
-      if (sectorCount === 0) x = 50; // PL
-      else if (sectorCount === 1) { x = 20; y = 20; } // Extremo Esq
-      else if (sectorCount === 2) { x = 80; y = 20; } // Extremo Dir
-      else if (sectorCount === 3) { x = 40; y = 15; } // 2º PL
+      if (sectorCount === 0) x = 50; 
+      else if (sectorCount === 1) { x = 20; y = 20; } 
+      else if (sectorCount === 2) { x = 80; y = 20; } 
+      else if (sectorCount === 3) { x = 40; y = 15; } 
       else { x = 50; y = 15; }
     }
 
@@ -275,7 +288,6 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
     x = Math.max(0, Math.min(100, x));
     y = Math.max(0, Math.min(100, y));
 
-    // AO ARRASTAR: Recalcula imediatamente a sigla conforme a zona!
     const newPositionName = getDynamicPosition(x, y);
 
     setStartingEleven(prev => prev.map(p => 
@@ -302,15 +314,40 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
       pdf.addImage(imgData, 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
       pdf.save(`Matchday_vs_${current?.opponent || 'Jogo'}.pdf`);
     } catch (err) {
-      alert('Erro ao gerar PDF');
+      openAlert('Erro', 'Ocorreu um erro ao gerar o PDF do plano de jogo.');
     } finally {
       setPdfLoading(false);
     }
   };
 
+  // Render do Modal Interno
+  const renderModal = () => {
+    if (!modal.show) return null;
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0b1121]/80 backdrop-blur-sm p-4">
+        <div className="bg-[#151c2c] border border-slate-700/50 rounded-2xl p-6 md:p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+          <h3 className="text-lg font-bold text-white mb-2">{modal.title}</h3>
+          <p className="text-sm font-medium text-slate-400 mb-8">{modal.message}</p>
+          <div className="flex gap-3 justify-end">
+            {modal.type === 'confirm' && (
+              <button onClick={closeModal} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors">Cancelar</button>
+            )}
+            <button 
+              onClick={() => { if (modal.onConfirm) modal.onConfirm(); else closeModal(); }}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${modal.type === 'confirm' ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'}`}
+            >
+              {modal.type === 'confirm' ? 'Eliminar' : 'OK'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (view === 'list') {
     return (
-      <div className="p-2 md:p-6 max-w-6xl mx-auto space-y-6">
+      <div className="p-2 md:p-6 max-w-6xl mx-auto space-y-6 relative">
+        {renderModal()}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
           <div>
             <h2 className="text-2xl font-semibold text-white tracking-tight mb-1">Dia do Jogo (Matchday)</h2>
@@ -353,7 +390,8 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
 
   if (view === 'form') {
     return (
-      <div className="p-2 md:p-6 max-w-5xl mx-auto">
+      <div className="p-2 md:p-6 max-w-5xl mx-auto relative">
+        {renderModal()}
         <div className="bg-[#151c2c] p-6 md:p-8 rounded-2xl border border-slate-800 shadow-lg space-y-8">
           <div className="flex justify-between items-center pb-4 border-b border-slate-800">
             <h2 className="text-xl font-semibold text-white">{current ? 'Editar Plano de Jogo' : 'Novo Plano de Jogo'}</h2>

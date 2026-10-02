@@ -9,7 +9,7 @@ import PlayersModule from './PlayersModule';
 import TacticalBoard from './TacticalBoard';
 import StatsModule from './StatsModule';
 import FutureScoutingModule from './FutureScoutingModule';
-import MatchdayPlannerModule from './MatchdayPlannerModule'; // <--- NOVO
+import MatchdayPlannerModule from './MatchdayPlannerModule';
 import MyAccount from './MyAccount'; 
 import Login from './Login';
 import TeamSelection from './TeamSelection';
@@ -25,7 +25,6 @@ const mapMatch = (row: any): MatchReport => ({ id: row.id, teamId: row.team_id, 
 const mapPlan = (row: any): TrainingPlan => ({ id: row.id, teamId: row.team_id, date: row.date, theme: row.theme, exercises: row.exercises, finalAppreciation: row.final_appreciation, board_image: row.board_image });
 const mapScouting = (row: any): FutureOpponentScouting => ({ id: row.id, teamId: row.team_id, opponentName: row.opponent_name, observationDate: row.observation_date, tacticalModel: row.tactical_model, behaviorWinning: row.behavior_winning, behaviorLosing: row.behavior_losing, substitutionsImpact: row.substitutions_impact, setPieces: row.set_pieces, setPiecesPhotoUrl: row.set_pieces_photo_url, strengths: row.strengths, weaknesses: row.weaknesses, strongPlayers: row.strong_players, weakPlayers: row.weak_players, observations: row.observations, attackingFormation: row.attacking_formation, defendingFormation: row.defending_formation, formationBoardImage: row.formation_board_image, offensiveCorners: row.offensive_corners, defensiveCorners: row.defensive_corners, offensiveCornersPhotoUrl: row.offensive_corners_photo_url, defensiveCornersPhotoUrl: row.defensive_corners_photo_url });
 
-// MAPEAMENTO DO PLANO DE JOGO
 const mapMatchday = (row: any): MatchdayPlan => ({
   id: row.id, teamId: row.team_id, date: row.date, opponent: row.opponent,
   gameObjectives: row.game_objectives, pressureType: row.pressure_type,
@@ -42,7 +41,7 @@ export default function App() {
   const [matchReports, setMatchReports] = useState<MatchReport[]>([]); 
   const [futureReports, setFutureReports] = useState<FutureOpponentScouting[]>([]);
   const [trainingPlans, setTrainingPlans] = useState<TrainingPlan[]>([]);
-  const [matchdayPlans, setMatchdayPlans] = useState<MatchdayPlan[]>([]); // <--- ESTADO DO PLANO DE JOGO
+  const [matchdayPlans, setMatchdayPlans] = useState<MatchdayPlan[]>([]);
   
   const [currentUser, setCurrentUser] = useState<StaffMember | null>(() => {
     const savedUser = localStorage.getItem('scoutpro_user');
@@ -250,13 +249,12 @@ export default function App() {
     if (data) setMatchReports([mapMatch(data), ...matchReports]);
   };
 
-  // MENU ITEMS COM O DIA DO JOGO (MATCHDAY)
   const menuItems = [
     { id: 'dashboard', label: 'Início', icon: '📊' },
     { id: 'players', label: 'Plantel', icon: '👕' },
     { id: 'training_plan', label: 'Planear Treino', icon: '📝' },
     { id: 'training', label: 'Avaliar Treino', icon: '⚽' },
-    { id: 'matchday', label: 'Dia do Jogo', icon: '🏟️' }, // <--- AQUI
+    { id: 'matchday', label: 'Dia do Jogo', icon: '🏟️' },
     { id: 'match', label: 'Nossos Jogos', icon: '🏆' },
     { id: 'future_scouting', label: 'Adversários', icon: '🔭' },
     { id: 'tactics', label: 'Tática', icon: '📋' },
@@ -338,7 +336,6 @@ export default function App() {
             {activeTab === 'training_plan' && <TrainingPlannerModule plans={trainingPlans} onAddPlan={handleAddTrainingPlan} onUpdatePlan={handleUpdateTrainingPlan} />}
             {activeTab === 'training' && <TrainingModule players={playersList} />}
             
-            {/* O MÓDULO DO DIA DO JOGO (MATCHDAY) */}
             {activeTab === 'matchday' && (
               <MatchdayPlannerModule 
                 players={playersList} 
@@ -346,14 +343,14 @@ export default function App() {
                 onAddPlan={async (p) => {
                   const payload = { team_id: activeTeam.id, date: p.date, opponent: p.opponent, game_objectives: p.gameObjectives, pressure_type: p.pressureType, pressure_notes: p.pressureNotes, warmup_exercises: p.warmupExercises, starting_eleven: p.startingEleven, offensive_corners: p.offensiveCorners, defensive_corners: p.defensiveCorners };
                   const { data, error } = await supabase.from('matchday_plans').insert([payload]).select().single();
-                  if (error) alert("Erro ao guardar o plano: " + error.message);
-                  else if (data) setMatchdayPlans([mapMatchday(data), ...matchdayPlans]);
+                  if (error) throw new Error(error.message);
+                  if (data) setMatchdayPlans([mapMatchday(data), ...matchdayPlans]);
                 }}
                 onUpdatePlan={async (p) => {
                   const payload = { date: p.date, opponent: p.opponent, game_objectives: p.gameObjectives, pressure_type: p.pressureType, pressure_notes: p.pressureNotes, warmup_exercises: p.warmupExercises, starting_eleven: p.startingEleven, offensive_corners: p.offensiveCorners, defensive_corners: p.defensiveCorners };
                   const { error } = await supabase.from('matchday_plans').update(payload).eq('id', p.id);
-                  if (error) alert("Erro ao atualizar o plano: " + error.message);
-                  else setMatchdayPlans(matchdayPlans.map(item => item.id === p.id ? p : item));
+                  if (error) throw new Error(error.message);
+                  setMatchdayPlans(matchdayPlans.map(item => item.id === p.id ? p : item));
                 }}
               />
             )}
