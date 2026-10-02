@@ -9,12 +9,13 @@ import PlayersModule from './PlayersModule';
 import TacticalBoard from './TacticalBoard';
 import StatsModule from './StatsModule';
 import FutureScoutingModule from './FutureScoutingModule';
+import MatchdayPlannerModule from './MatchdayPlannerModule'; // <--- NOVO
 import MyAccount from './MyAccount'; 
 import Login from './Login';
 import TeamSelection from './TeamSelection';
-import { StaffMember, Player, MatchReport, FutureOpponentScouting, Team, TrainingPlan } from './types';
+import { StaffMember, Player, MatchReport, FutureOpponentScouting, Team, TrainingPlan, MatchdayPlan } from './types';
 
-type TabType = 'dashboard' | 'training_plan' | 'training' | 'match' | 'future_scouting' | 'admin' | 'players' | 'tactics' | 'stats' | 'account';
+type TabType = 'dashboard' | 'training_plan' | 'training' | 'match' | 'matchday' | 'future_scouting' | 'admin' | 'players' | 'tactics' | 'stats' | 'account';
 const TIMEOUT_MS = 15 * 60 * 1000; 
 
 const mapStaff = (row: any): StaffMember => ({ id: row.id, username: row.username, password: row.password, name: row.name, age: row.age, address: row.address, phone: row.phone, role: row.role, must_change_password: row.must_change_password });
@@ -22,16 +23,16 @@ const mapTeam = (row: any): Team => ({ id: row.id, year: row.year, club: row.clu
 const mapPlayer = (row: any): Player => ({ id: row.id, teamId: row.team_id, name: row.name, age: row.age, position: row.position, preferredFoot: row.preferred_foot, birthDate: row.birth_date, notes: row.notes, photoUrl: row.photo_url });
 const mapMatch = (row: any): MatchReport => ({ id: row.id, teamId: row.team_id, date: row.date, opponent: row.opponent, oppTacticalSystem: row.opp_tactical_system, oppBehaviorWinning: row.opp_behavior_winning, oppBehaviorLosing: row.opp_behavior_losing, oppSubstitutions: row.opp_substitutions, oppSetPieces: row.opp_set_pieces, oppFinalEval: row.opp_final_eval, ownInitialSystem: row.own_initial_system, ownFinalSystem: row.own_final_system, ownTeamPositives: row.own_team_positives, ownTeamNegatives: row.own_team_negatives, goalsScored: row.goals_scored, goalsConceded: row.goals_conceded, individualEvals: row.individual_evals });
 const mapPlan = (row: any): TrainingPlan => ({ id: row.id, teamId: row.team_id, date: row.date, theme: row.theme, exercises: row.exercises, finalAppreciation: row.final_appreciation, board_image: row.board_image });
+const mapScouting = (row: any): FutureOpponentScouting => ({ id: row.id, teamId: row.team_id, opponentName: row.opponent_name, observationDate: row.observation_date, tacticalModel: row.tactical_model, behaviorWinning: row.behavior_winning, behaviorLosing: row.behavior_losing, substitutionsImpact: row.substitutions_impact, setPieces: row.set_pieces, setPiecesPhotoUrl: row.set_pieces_photo_url, strengths: row.strengths, weaknesses: row.weaknesses, strongPlayers: row.strong_players, weakPlayers: row.weak_players, observations: row.observations, attackingFormation: row.attacking_formation, defendingFormation: row.defending_formation, formationBoardImage: row.formation_board_image, offensiveCorners: row.offensive_corners, defensiveCorners: row.defensive_corners, offensiveCornersPhotoUrl: row.offensive_corners_photo_url, defensiveCornersPhotoUrl: row.defensive_corners_photo_url });
 
-const mapScouting = (row: any): FutureOpponentScouting => ({ 
-  id: row.id, teamId: row.team_id, opponentName: row.opponent_name, observationDate: row.observation_date, 
-  tacticalModel: row.tactical_model, behaviorWinning: row.behavior_winning, behaviorLosing: row.behavior_losing, 
-  substitutionsImpact: row.substitutions_impact, setPieces: row.set_pieces, setPiecesPhotoUrl: row.set_pieces_photo_url, 
-  strengths: row.strengths, weaknesses: row.weaknesses, strongPlayers: row.strong_players, weakPlayers: row.weak_players, 
-  observations: row.observations, attackingFormation: row.attacking_formation, defendingFormation: row.defending_formation,
-  formationBoardImage: row.formation_board_image, offensiveCorners: row.offensive_corners,
-  defensiveCorners: row.defensive_corners, offensiveCornersPhotoUrl: row.offensive_corners_photo_url,
-  defensiveCornersPhotoUrl: row.defensive_corners_photo_url
+// MAPEAMENTO DO PLANO DE JOGO
+const mapMatchday = (row: any): MatchdayPlan => ({
+  id: row.id, teamId: row.team_id, date: row.date, opponent: row.opponent,
+  gameObjectives: row.game_objectives, pressureType: row.pressure_type,
+  pressureNotes: row.pressure_notes, warmupExercises: row.warmup_exercises,
+  startingEleven: row.starting_eleven, offensiveCorners: row.offensive_corners,
+  defensiveCorners: row.defensive_corners, offensiveCornersBoard: row.offensive_corners_board,
+  defensiveCornersBoard: row.defensive_corners_board
 });
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
   const [matchReports, setMatchReports] = useState<MatchReport[]>([]); 
   const [futureReports, setFutureReports] = useState<FutureOpponentScouting[]>([]);
   const [trainingPlans, setTrainingPlans] = useState<TrainingPlan[]>([]);
+  const [matchdayPlans, setMatchdayPlans] = useState<MatchdayPlan[]>([]); // <--- ESTADO DO PLANO DE JOGO
   
   const [currentUser, setCurrentUser] = useState<StaffMember | null>(() => {
     const savedUser = localStorage.getItem('scoutpro_user');
@@ -113,16 +115,18 @@ export default function App() {
   useEffect(() => {
     if (!activeTeam) return;
     const loadTeamData = async () => {
-      const [p, m, t, f] = await Promise.all([
+      const [p, m, t, f, md] = await Promise.all([
         supabase.from('players').select('*').eq('team_id', activeTeam.id),
         supabase.from('match_reports').select('*').eq('team_id', activeTeam.id).order('date', { ascending: false }),
         supabase.from('training_plans').select('*').eq('team_id', activeTeam.id).order('date', { ascending: false }),
-        supabase.from('future_scouting').select('*').eq('team_id', activeTeam.id).order('observation_date', { ascending: false })
+        supabase.from('future_scouting').select('*').eq('team_id', activeTeam.id).order('observation_date', { ascending: false }),
+        supabase.from('matchday_plans').select('*').eq('team_id', activeTeam.id).order('date', { ascending: false })
       ]);
       if (p.data) setPlayersList(p.data.map(mapPlayer));
       if (m.data) setMatchReports(m.data.map(mapMatch));
       if (t.data) setTrainingPlans(t.data.map(mapPlan));
       if (f.data) setFutureReports(f.data.map(mapScouting));
+      if (md.data) setMatchdayPlans(md.data.map(mapMatchday));
     };
     loadTeamData();
   }, [activeTeam]);
@@ -221,44 +225,18 @@ export default function App() {
     if (data) setTeams([mapTeam(data), ...teams]);
   };
 
-  // GRAVAR NOVO TREINO NO SUPABASE (COM AVISO DE ERRO)
   const handleAddTrainingPlan = async (p: TrainingPlan) => {
-    const payload = { 
-      team_id: activeTeam!.id, 
-      date: p.date, 
-      theme: p.theme, 
-      exercises: p.exercises, 
-      final_appreciation: p.finalAppreciation, 
-      board_image: p.board_image 
-    };
+    const payload = { team_id: activeTeam!.id, date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation, board_image: p.board_image };
     const { data, error } = await supabase.from('training_plans').insert([payload]).select().single();
-    if (error) {
-      alert("Erro ao guardar treino no Supabase: " + error.message);
-      console.error(error);
-      return;
-    }
+    if (error) alert("Erro: " + error.message);
     if (data) setTrainingPlans([mapPlan(data), ...trainingPlans]);
   };
 
-  // ATUALIZAR TREINO NO SUPABASE (COM AVISO DE ERRO)
   const handleUpdateTrainingPlan = async (p: TrainingPlan) => {
-    const payload = { 
-      date: p.date, 
-      theme: p.theme, 
-      exercises: p.exercises, 
-      final_appreciation: p.finalAppreciation, 
-      board_image: p.board_image 
-    };
+    const payload = { date: p.date, theme: p.theme, exercises: p.exercises, final_appreciation: p.finalAppreciation, board_image: p.board_image };
     const { data, error } = await supabase.from('training_plans').update(payload).eq('id', p.id).select().single();
-    if (error) {
-      alert("Erro ao atualizar treino no Supabase: " + error.message);
-      console.error(error);
-      return;
-    }
-    if (data) {
-      const updated = mapPlan(data);
-      setTrainingPlans(trainingPlans.map(plan => plan.id === updated.id ? updated : plan));
-    }
+    if (error) alert("Erro: " + error.message);
+    if (data) setTrainingPlans(trainingPlans.map(plan => plan.id === mapPlan(data).id ? mapPlan(data) : plan));
   };
 
   const handleAddMatchReport = async (r: MatchReport) => {
@@ -272,15 +250,13 @@ export default function App() {
     if (data) setMatchReports([mapMatch(data), ...matchReports]);
   };
 
-  if (!activeTeam) {
-    return <TeamSelection teams={teams} isAdmin={isAdmin} onSelectTeam={(t) => setActiveTeam(t)} onCreateTeam={handleCreateTeam} onLogout={handleLogout} />;
-  }
-
+  // MENU ITEMS COM O DIA DO JOGO (MATCHDAY)
   const menuItems = [
     { id: 'dashboard', label: 'Início', icon: '📊' },
     { id: 'players', label: 'Plantel', icon: '👕' },
     { id: 'training_plan', label: 'Planear Treino', icon: '📝' },
     { id: 'training', label: 'Avaliar Treino', icon: '⚽' },
+    { id: 'matchday', label: 'Dia do Jogo', icon: '🏟️' }, // <--- AQUI
     { id: 'match', label: 'Nossos Jogos', icon: '🏆' },
     { id: 'future_scouting', label: 'Adversários', icon: '🔭' },
     { id: 'tactics', label: 'Tática', icon: '📋' },
@@ -289,6 +265,10 @@ export default function App() {
   ];
 
   if (isAdmin) menuItems.splice(1, 0, { id: 'admin', label: 'Staff', icon: '👥' });
+
+  if (!activeTeam) {
+    return <TeamSelection teams={teams} isAdmin={isAdmin} onSelectTeam={(t) => setActiveTeam(t)} onCreateTeam={handleCreateTeam} onLogout={handleLogout} />;
+  }
 
   return (
     <div className="flex h-screen bg-[#090e17] text-slate-200 font-sans overflow-hidden">
@@ -357,6 +337,27 @@ export default function App() {
             {activeTab === 'players' && <PlayersModule />}
             {activeTab === 'training_plan' && <TrainingPlannerModule plans={trainingPlans} onAddPlan={handleAddTrainingPlan} onUpdatePlan={handleUpdateTrainingPlan} />}
             {activeTab === 'training' && <TrainingModule players={playersList} />}
+            
+            {/* O MÓDULO DO DIA DO JOGO (MATCHDAY) */}
+            {activeTab === 'matchday' && (
+              <MatchdayPlannerModule 
+                players={playersList} 
+                plans={matchdayPlans} 
+                onAddPlan={async (p) => {
+                  const payload = { team_id: activeTeam.id, date: p.date, opponent: p.opponent, game_objectives: p.gameObjectives, pressure_type: p.pressureType, pressure_notes: p.pressureNotes, warmup_exercises: p.warmupExercises, starting_eleven: p.startingEleven, offensive_corners: p.offensiveCorners, defensive_corners: p.defensiveCorners };
+                  const { data, error } = await supabase.from('matchday_plans').insert([payload]).select().single();
+                  if (error) alert("Erro ao guardar o plano: " + error.message);
+                  else if (data) setMatchdayPlans([mapMatchday(data), ...matchdayPlans]);
+                }}
+                onUpdatePlan={async (p) => {
+                  const payload = { date: p.date, opponent: p.opponent, game_objectives: p.gameObjectives, pressure_type: p.pressureType, pressure_notes: p.pressureNotes, warmup_exercises: p.warmupExercises, starting_eleven: p.startingEleven, offensive_corners: p.offensiveCorners, defensive_corners: p.defensiveCorners };
+                  const { error } = await supabase.from('matchday_plans').update(payload).eq('id', p.id);
+                  if (error) alert("Erro ao atualizar o plano: " + error.message);
+                  else setMatchdayPlans(matchdayPlans.map(item => item.id === p.id ? p : item));
+                }}
+              />
+            )}
+
             {activeTab === 'match' && <MatchModule players={playersList} reports={matchReports} onAddReport={handleAddMatchReport} />}
             {activeTab === 'future_scouting' && <FutureScoutingModule reports={futureReports} />}
             {activeTab === 'tactics' && <TacticalBoard players={playersList} />}

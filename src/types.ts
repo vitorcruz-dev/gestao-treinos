@@ -119,7 +119,6 @@ export interface FutureOpponentScouting {
   strongPlayers?: string;
   weakPlayers?: string;
   observations?: string;
-  // NOVOS CAMPOS DO RELATÓRIO PROFISSIONAL
   attackingFormation?: string;
   defendingFormation?: string;
   formationBoardImage?: string;
@@ -127,4 +126,29 @@ export interface FutureOpponentScouting {
   defensiveCorners?: string;
   offensiveCornersPhotoUrl?: string;
   defensiveCornersPhotoUrl?: string;
+}
+
+export interface StartingPlayerPosition {
+  playerId: string;
+  playerName: string;
+  photoUrl?: string;
+  positionName: string; 
+  x: number; 
+  y: number; 
+}
+
+export interface MatchdayPlan {
+  id: string;
+  teamId: string;
+  date: string;
+  opponent: string;
+  gameObjectives?: string;
+  pressureType?: 'alta' | 'media' | 'baixa';
+  pressureNotes?: string;
+  warmupExercises?: ExercisePlan[];
+  startingEleven?: StartingPlayerPosition[];
+  offensiveCorners?: string;
+  defensiveCorners?: string;
+  offensiveCornersBoard?: string;
+  defensiveCornersBoard?: string;
 }
