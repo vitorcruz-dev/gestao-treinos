@@ -181,14 +181,19 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
     }
   };
 
-  // Lógica inteligente para atribuir posição consoante as coordenadas (X,Y)
+  // =========================================================
+  // GESTÃO INTELIGENTE DE COORDENADAS E NOMENCLATURA TÁTICA
+  // =========================================================
+
+  // Transforma coordenadas percentuais em siglas (Ex: Y > 60 vira Defesa)
   const getDynamicPosition = (x: number, y: number) => {
-    if (y > 85) return 'GR';
-    if (y > 65) return x < 33 ? 'LE' : x > 66 ? 'LD' : 'DC';
-    if (y > 35) return x < 33 ? 'ME' : x > 66 ? 'MD' : 'MC';
-    return x < 33 ? 'EE' : x > 66 ? 'ED' : 'PL';
+    if (y > 82) return 'GR';
+    if (y > 60) return x < 30 ? 'LE' : x > 70 ? 'LD' : 'DC';
+    if (y > 32) return x < 35 ? 'ME' : x > 65 ? 'MD' : 'MC';
+    return x < 30 ? 'EE' : x > 70 ? 'ED' : 'PL';
   };
 
+  // Motor Inteligente para decidir para onde o jogador vai ao clicar nele
   const addPlayerToStartingEleven = (player: Player) => {
     if (startingEleven.some(p => p.playerId === player.id)) return;
     if (startingEleven.length >= 11) {
@@ -196,15 +201,52 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
       return;
     }
 
-    const defaultCoords = [
-      { x: 50, y: 88 },
-      { x: 20, y: 70 }, { x: 40, y: 75 }, { x: 60, y: 75 }, { x: 80, y: 70 },
-      { x: 35, y: 50 }, { x: 65, y: 50 }, { x: 50, y: 35 },
-      { x: 20, y: 20 }, { x: 50, y: 15 }, { x: 80, y: 20 },
-    ];
+    // 1. Descobrir a posição "padrão" do jogador vinda do Perfil
+    const posStr = (player.position || '').toLowerCase();
+    let sector = 'MED'; // Omissão caso a sigla seja estranha
+    if (posStr.includes('gr') || posStr.includes('guarda')) sector = 'GR';
+    else if (posStr.includes('def') || posStr.includes('lat') || posStr.includes('central')) sector = 'DEF';
+    else if (posStr.includes('med') || posStr.includes('méd') || posStr.includes('trinco')) sector = 'MED';
+    else if (posStr.includes('ava') || posStr.includes('ext') || posStr.includes('pont')) sector = 'AVA';
 
-    const nextSpot = defaultCoords[startingEleven.length] || { x: 50, y: 50 };
-    const dynamicPos = getDynamicPosition(nextSpot.x, nextSpot.y);
+    // 2. Contar quantos jogadores já lá estão no mesmo setor para os distribuir
+    let sectorCount = 0;
+    startingEleven.forEach(ep => {
+      if (ep.y > 82 && sector === 'GR') sectorCount++;
+      else if (ep.y > 60 && ep.y <= 82 && sector === 'DEF') sectorCount++;
+      else if (ep.y > 32 && ep.y <= 60 && sector === 'MED') sectorCount++;
+      else if (ep.y <= 32 && sector === 'AVA') sectorCount++;
+    });
+
+    // 3. Atribuir a coordenada consoante o número de "colegas" já lá colocados
+    let x = 50, y = 50;
+
+    if (sector === 'GR') {
+      y = 88; x = 50;
+    } else if (sector === 'DEF') {
+      y = 75;
+      if (sectorCount === 0) x = 40; // 1º Central
+      else if (sectorCount === 1) x = 60; // 2º Central
+      else if (sectorCount === 2) x = 15; // Lateral Esquerdo
+      else if (sectorCount === 3) x = 85; // Lateral Direito
+      else { x = 50; y = 70; } 
+    } else if (sector === 'MED') {
+      y = 50;
+      if (sectorCount === 0) x = 50; // MC / Trinco
+      else if (sectorCount === 1) x = 30; // Interior Esq
+      else if (sectorCount === 2) x = 70; // Interior Dir
+      else if (sectorCount === 3) { x = 50; y = 35; } // Nº 10
+      else { x = 50; y = 45; }
+    } else if (sector === 'AVA') {
+      y = 15;
+      if (sectorCount === 0) x = 50; // PL
+      else if (sectorCount === 1) { x = 20; y = 20; } // Extremo Esq
+      else if (sectorCount === 2) { x = 80; y = 20; } // Extremo Dir
+      else if (sectorCount === 3) { x = 40; y = 15; } // 2º PL
+      else { x = 50; y = 15; }
+    }
+
+    const dynamicPos = getDynamicPosition(x, y);
 
     setStartingEleven([
       ...startingEleven,
@@ -213,8 +255,8 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
         playerName: player.name,
         photoUrl: player.photoUrl,
         positionName: dynamicPos,
-        x: nextSpot.x,
-        y: nextSpot.y,
+        x,
+        y,
       }
     ]);
   };
@@ -233,7 +275,7 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
     x = Math.max(0, Math.min(100, x));
     y = Math.max(0, Math.min(100, y));
 
-    // ATUALIZA A POSIÇÃO DINAMICAMENTE ENQUANTO ARRASTA!
+    // AO ARRASTAR: Recalcula imediatamente a sigla conforme a zona!
     const newPositionName = getDynamicPosition(x, y);
 
     setStartingEleven(prev => prev.map(p => 
@@ -340,7 +382,7 @@ export default function MatchdayPlannerModule({ players, plans, onAddPlan, onUpd
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-[#0f1523] p-4 rounded-xl border border-slate-800 h-96 overflow-y-auto custom-scrollbar">
-                  <span className="block text-[10px] font-bold text-slate-500 uppercase mb-3">Clique para adicionar ao 11</span>
+                  <span className="block text-[10px] font-bold text-slate-500 uppercase mb-3">Clique para colocar no campo</span>
                   <div className="space-y-2">
                     {players.map(p => {
                       const isSelected = startingEleven.some(e => e.playerId === p.id);
